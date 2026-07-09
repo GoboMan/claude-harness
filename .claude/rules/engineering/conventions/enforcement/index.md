@@ -6,7 +6,7 @@
 
 ## なぜ rules に置くか（skill にしない）
 
-セットアップは副作用が目的で純関数化できない。一方このリポジトリの rules は**カタログ routing で葉単位に遅延ロード**されるため、「必要なときだけ読む」性質は rules でも満たせる。よって durable な知識（何を・どう強制するか）は rules に置き、実行はそれに沿うタスクとする。skill は「実行アセット同梱」か「多段・エージェント的手続き」のときだけ（例外: [git-guardrails](../../../../skills/engineering/git-guardrails-claude-code/SKILL.md) はスクリプト同梱のため skill）。
+セットアップは副作用が目的で純関数化できない。一方このリポジトリの rules は**カタログ routing で葉単位に遅延ロード**されるため、「必要なときだけ読む」性質は rules でも満たせる。よって durable な知識（何を・どう強制するか）は rules に置き、実行はそれに沿うタスクとする。skill は「実行アセット同梱」か「多段・エージェント的手続き」のときだけ（例外: [git-guardrails](../../../../skills/git-guardrails-claude-code/SKILL.md) はスクリプト同梱のため skill）。
 
 ## 3層モデル（防御の深さ）
 

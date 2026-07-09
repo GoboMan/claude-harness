@@ -7,8 +7,8 @@ description: プロジェクトを claude-harness の rules に準拠した「�
 
 > `.claude/` を導入した直後の**起動導線**。プロジェクトを rules に準拠させ、**実装に移れる状態**まで持っていく。
 > 新規（greenfield）でも既存コード＋固有 docs（brownfield）でも同じ入口で扱う。
-> rules の核は [process.md](../../../rules/engineering/practices/process.md)、docs 配置は [layout.md](../../../rules/engineering/conventions/docs/layout.md)、
-> 機械強制は [enforcement/index.md](../../../rules/engineering/conventions/enforcement/index.md)。
+> rules の核は [process.md](../../rules/engineering/practices/process.md)、docs 配置は [layout.md](../../rules/engineering/conventions/docs/layout.md)、
+> 機械強制は [enforcement/index.md](../../rules/engineering/conventions/enforcement/index.md)。
 
 ## ⛔ 最重要の前提（誇張しない・コア制約と衝突させない）
 
@@ -18,7 +18,7 @@ description: プロジェクトを claude-harness の rules に準拠した「�
   `all-green・fixed・正しい` になるわけではない。**ここを正直に線引きする**（下表）。
 - **作る主体と判定する主体を分ける。** 逆生成（ビルダー）と不整合検出（オラクル）は別コンテキストで回す
   （コード由来の逆生成は [retrofit-to-rules](../retrofit-to-rules/SKILL.md) に委譲）。
-- **冪等に。** すべての生成・追記は [setup-idempotency.md](../../../rules/engineering/conventions/setup-idempotency.md) に従い、
+- **冪等に。** すべての生成・追記は [setup-idempotency.md](../../rules/engineering/conventions/setup-idempotency.md) に従い、
   既存を clobber せず dedup 追記し、プロジェクト内スコープに閉じる。
 
 ### bootstrap が「自動で行う」／「人間の判断が要る」
@@ -54,7 +54,7 @@ bash .claude/tools/enforcement-report/enforcement-report.sh
 
 ### 1. docs レイアウトを整える
 
-[layout.md](../../../rules/engineering/conventions/docs/layout.md) の骨格を用意する（無ければ作る・既存は温存）。
+[layout.md](../../rules/engineering/conventions/docs/layout.md) の骨格を用意する（無ければ作る・既存は温存）。
 
 ```
 docs/spec/features.md   docs/spec/<feature>.md   docs/contracts/<feature>.md   docs/adr/
@@ -65,9 +65,9 @@ docs/spec/features.md   docs/spec/<feature>.md   docs/contracts/<feature>.md   d
 
 ### 2. SSOT を整える（すべて draft・暫定で）
 
-- **greenfield**: [feature-list.md](../../../rules/engineering/conventions/docs/feature-list.md) /
-  [feature-spec.md](../../../rules/engineering/conventions/docs/feature-spec.md) /
-  [contract.md](../../../rules/engineering/conventions/docs/contract.md) のテンプレから雛形を置く（`draft`）。
+- **greenfield**: [feature-list.md](../../rules/engineering/conventions/docs/feature-list.md) /
+  [feature-spec.md](../../rules/engineering/conventions/docs/feature-spec.md) /
+  [contract.md](../../rules/engineering/conventions/docs/contract.md) のテンプレから雛形を置く（`draft`）。
 - **brownfield**:
   1. **既存固有 docs の整形**: 内容を保持したまま feature-list / feature-spec / contract の**厳格フォーマットへ写す**。
      情報が欠けるセクションは `draft` のまま空欄を残し、埋めるのは人間に委ねる（勝手に確定させない）。
@@ -82,14 +82,14 @@ node .claude/tools/spec-lint/spec-lint.mjs validate
 
 ### 3. enforcement を配線する（冪等）
 
-[enforcement/index.md](../../../rules/engineering/conventions/enforcement/index.md) の葉に沿って、検出したスタックに合わせて設置する。
+[enforcement/index.md](../../rules/engineering/conventions/enforcement/index.md) の葉に沿って、検出したスタックに合わせて設置する。
 
-- **フック**（[hooks.md](../../../rules/engineering/conventions/enforcement/hooks.md)）: commit-msg（commit 規約＋任意で spec-lint `gate`）、pre-commit（`lint:code`＋テスト＋任意で spec-lint `validate`）。Husky か `core.hooksPath`。
-- **コーディング規約**（[coding-standards.md](../../../rules/engineering/conventions/enforcement/coding-standards.md)）: PHP=PHPCS＋[php-conventions](../../../tools/php-conventions/php-conventions.mjs)、JS=ESLint。
-- **層依存 / 秘密情報 / CI**（[layer-boundaries.md](../../../rules/engineering/conventions/enforcement/layer-boundaries.md) / [secrets.md](../../../rules/engineering/conventions/enforcement/secrets.md) / [ci.md](../../../rules/engineering/conventions/enforcement/ci.md)）: 必要に応じ deptrac/dep-cruiser・gitleaks・GitHub Actions。
+- **フック**（[hooks.md](../../rules/engineering/conventions/enforcement/hooks.md)）: commit-msg（commit 規約＋任意で spec-lint `gate`）、pre-commit（`lint:code`＋テスト＋任意で spec-lint `validate`）。Husky か `core.hooksPath`。
+- **コーディング規約**（[coding-standards.md](../../rules/engineering/conventions/enforcement/coding-standards.md)）: PHP=PHPCS＋[php-conventions](../../tools/php-conventions/php-conventions.mjs)、JS=ESLint。
+- **層依存 / 秘密情報 / CI**（[layer-boundaries.md](../../rules/engineering/conventions/enforcement/layer-boundaries.md) / [secrets.md](../../rules/engineering/conventions/enforcement/secrets.md) / [ci.md](../../rules/engineering/conventions/enforcement/ci.md)）: 必要に応じ deptrac/dep-cruiser・gitleaks・GitHub Actions。
 - **L3 ブランチ保護**は能力次第（admin＋プラン）。張れなければ「未設定」と残す。
 
-すべて **dedup／clobber 回避**（[setup-idempotency.md](../../../rules/engineering/conventions/setup-idempotency.md)）。
+すべて **dedup／clobber 回避**（[setup-idempotency.md](../../rules/engineering/conventions/setup-idempotency.md)）。
 
 ### 4. 準拠状況を計測する
 
@@ -108,7 +108,7 @@ bash .claude/tools/enforcement-report/enforcement-report.sh --out docs/enforceme
 
 - ✅ 済: docs レイアウト・厳格フォーマット化・enforcement 配線・準拠レポート
 - ⏳ 人間: 暫定 SSOT の確認と **`draft→fixed` 昇格**、既存コード違反の解消
-- ▶ 実装（Phase 4）へ進めるのは、**対象機能の spec と契約が `fixed`** になってから（[process.md](../../../rules/engineering/practices/process.md) コア制約1・6）。
+- ▶ 実装（Phase 4）へ進めるのは、**対象機能の spec と契約が `fixed`** になってから（[process.md](../../rules/engineering/practices/process.md) コア制約1・6）。
 
 ## ✅ 着手前チェックリスト
 

@@ -2,7 +2,7 @@
 
 > config 生成・フック導入・ツール設定などの**セットアップ作業は副作用が目的**なので純関数にはなり得ない。
 > だが実務上は **「冪等・自己完結・非破壊・スコープ閉じ」** を満たせば純関数的に扱える。本書はその固定基準を定める。
-> [enforcement/](./enforcement/index.md) の各葉に沿って設定を材料化するとき、および設定を伴う skill（[git-guardrails](../../../skills/engineering/git-guardrails-claude-code/SKILL.md) 等）を書くときに従う。
+> [enforcement/](./enforcement/index.md) の各葉に沿って設定を材料化するとき、および設定を伴う skill（[git-guardrails](../../../skills/git-guardrails-claude-code/SKILL.md) 等）を書くときに従う。
 
 ## なぜ必要か
 
@@ -52,7 +52,7 @@
 | `package.json` の `scripts` | [coding-standards.md](./enforcement/coding-standards.md), [layer-boundaries.md](./enforcement/layer-boundaries.md) |
 | `composer.json` の `scripts` | 同上 |
 | `.github/workflows/*.yml` | [ci.md](./enforcement/ci.md), [secrets.md](./enforcement/secrets.md) |
-| `.claude/settings.json` / `~/.claude/settings.json` の `hooks` | [git-guardrails](../../../skills/engineering/git-guardrails-claude-code/SKILL.md) |
+| `.claude/settings.json` / `~/.claude/settings.json` の `hooks` | [git-guardrails](../../../skills/git-guardrails-claude-code/SKILL.md) |
 
 > これらに触るときは、必ず **grep/キー存在チェック → 無ければ追記** の形にする。上書き・無条件追記は禁止。
 

@@ -81,14 +81,12 @@ claude-harness/
       │              ├── index.md
       │              └── blog.md            # 📦 ブログ執筆のルール
       │
-      └── skills/                           # 🛠️ 共通スキル（description で自動起動）
-           ├── productivity/
-           │    ├── grilling/SKILL.md
-           │    └── grill-me/SKILL.md
-           └── engineering/
-                ├── bootstrap-project/SKILL.md          # 導入直後の起動導線（新規/既存を rules 準拠にして実装可能状態へ）
-                ├── retrofit-to-rules/SKILL.md          # 既存コードから暫定 SSOT+テストを逆生成（bootstrap が委譲）
-                └── git-guardrails-claude-code/SKILL.md # 危険な git 操作をブロック（スクリプト同梱）
+      └── skills/                           # 🛠️ 共通スキル（description で自動起動 / /name で明示起動）
+           │  ※ skill は必ず skills/<name>/SKILL.md の1階層に置く（Claude Code はこの階層しか探索しない）
+           ├── bootstrap-project/SKILL.md          # 導入直後の起動導線（新規/既存を rules 準拠にして実装可能状態へ）
+           ├── retrofit-to-rules/SKILL.md          # 既存コードから暫定 SSOT+テストを逆生成（bootstrap が委譲）
+           ├── grilling/SKILL.md                   # 計画・設計を詰めるインタビュー
+           └── git-guardrails-claude-code/SKILL.md # 危険な git 操作をブロック（スクリプト同梱）
 ```
 
 > 💡 **機械チェック（commit / coding / test / secret / 層 / 仕様 のフック・CI・ブランチ保護）は skill ではなく

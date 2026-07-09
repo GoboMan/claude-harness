@@ -6,7 +6,7 @@ description: 既存プロジェクトを claude-harness の rules に準拠さ�
 # 🧰 retrofit-to-rules — 既存プロジェクトを rules 準拠にする
 
 > このスキルは、コードが先にあり SSOT が無い「既存プロジェクト」を、本リポジトリの rules に準拠させる**レトロフィット手順**。
-> rules 本体は「SSOT が実装に先行する」前向きプロセスを前提にする（[process.md](../../../rules/engineering/practices/process.md) コア制約1）。既存プロジェクトはその逆なので、**コードから SSOT を逆生成しつつ、逆生成した SSOT を「真実」に昇格させない**のがこのスキルの肝。
+> rules 本体は「SSOT が実装に先行する」前向きプロセスを前提にする（[process.md](../../rules/engineering/practices/process.md) コア制約1）。既存プロジェクトはその逆なので、**コードから SSOT を逆生成しつつ、逆生成した SSOT を「真実」に昇格させない**のがこのスキルの肝。
 
 ## ⛔ 最重要の前提（コア制約と衝突させない）
 
@@ -16,13 +16,13 @@ description: 既存プロジェクトを claude-harness の rules に準拠さ�
 
 ## 0. 準備 — ルーティングして規約を掴む
 
-1. まず核を読む: [process.md](../../../rules/engineering/practices/process.md)（常に最初）。
+1. まず核を読む: [process.md](../../rules/engineering/practices/process.md)（常に最初）。
 2. 対象を分類し、該当する葉だけを開く（関係ない葉は開かない）:
-   - docs レイアウトの住所 → [docs/layout.md](../../../rules/engineering/conventions/docs/layout.md)
-   - 機能詳細(SSOT)の書式 → [feature-spec.md](../../../rules/engineering/conventions/docs/feature-spec.md)
-   - commit / PR → [git.md](../../../rules/engineering/conventions/git.md)
-   - platform / framework 規約 → [engineering/index.md](../../../rules/engineering/index.md) を辿る（例: Web/crow なら [coding.md](../../../rules/engineering/web/crow/coding.md) と [testing.md](../../../rules/engineering/web/crow/testing.md)）
-3. スコープを宣言する。**全体を一気にやらない。** リスクの高い / 変更頻度の高いサブシステムから、縦切りスライス単位で進める（[process-agents.md](../../../rules/engineering/practices/process-agents.md) §3 の粒度判定に従う。デフォルトは粗粒度）。
+   - docs レイアウトの住所 → [docs/layout.md](../../rules/engineering/conventions/docs/layout.md)
+   - 機能詳細(SSOT)の書式 → [feature-spec.md](../../rules/engineering/conventions/docs/feature-spec.md)
+   - commit / PR → [git.md](../../rules/engineering/conventions/git.md)
+   - platform / framework 規約 → [engineering/index.md](../../rules/engineering/index.md) を辿る（例: Web/crow なら [coding.md](../../rules/engineering/web/crow/coding.md) と [testing.md](../../rules/engineering/web/crow/testing.md)）
+3. スコープを宣言する。**全体を一気にやらない。** リスクの高い / 変更頻度の高いサブシステムから、縦切りスライス単位で進める（[process-agents.md](../../rules/engineering/practices/process-agents.md) §3 の粒度判定に従う。デフォルトは粗粒度）。
 
 ## 実行フロー（逆生成 → 独立判定 → バックフィル → 攻撃）
 
@@ -31,13 +31,13 @@ description: 既存プロジェクトを claude-harness の rules に準拠さ�
 ### Phase R1 — 現状の棚卸し（features を逆生成）
 
 - ルート / エンドポイント / 画面 / コマンド等を走査し、**実在する機能を漏れなく列挙**して `docs/spec/features.md` に書く。
-- 機能ごとに `docs/spec/<feature>.md` を作り、観測される振る舞いから**反証可能な GWT**（Given-When-Then）を起こす。ハッピーパスだけでなく、失敗・空・権限・境界の実挙動も条件化する。書式は [feature-spec.md](../../../rules/engineering/conventions/docs/feature-spec.md) の必須フォーマットに従う（ただしステータスは `draft`＝要人間確認のまま）。
+- 機能ごとに `docs/spec/<feature>.md` を作り、観測される振る舞いから**反証可能な GWT**（Given-When-Then）を起こす。ハッピーパスだけでなく、失敗・空・権限・境界の実挙動も条件化する。書式は [feature-spec.md](../../rules/engineering/conventions/docs/feature-spec.md) の必須フォーマットに従う（ただしステータスは `draft`＝要人間確認のまま）。
 - **各機能・各 GWT の先頭に `<!-- 暫定: コードから逆生成。要人間確認 -->` を必ず付す。**
 - 起動: `general-purpose` サブエージェント（探索・逆生成のビルダー役）。
 
 ### Phase R2 — 契約の抽出（contracts）
 
-- 各機能の実際の request / response の形を `docs/contracts/<feature>.md` に固定する（[docs/layout.md](../../../rules/engineering/conventions/docs/layout.md) の 1機能1契約）。
+- 各機能の実際の request / response の形を `docs/contracts/<feature>.md` に固定する（[docs/layout.md](../../rules/engineering/conventions/docs/layout.md) の 1機能1契約）。
 - 実装から読み取れても、**契約も「暫定・要確認」**として扱う。ここが後続テストの唯一の拠り所になる。
 
 ### Phase R3 — ADR の遡及記録（adr）
@@ -47,16 +47,16 @@ description: 既存プロジェクトを claude-harness の rules に準拠さ�
 
 ### Phase R4 — 独立オラクルで不整合を暴く（別コンテキスト必須）
 
-- **別のサブエージェント**を起動し、[process-agents.md](../../../rules/engineering/practices/process-agents.md) §5-E 構造整合オラクルのミッションを与える。
+- **別のサブエージェント**を起動し、[process-agents.md](../../rules/engineering/practices/process-agents.md) §5-E 構造整合オラクルのミッションを与える。
 - 探すのは「一致」ではなく「**不整合**」: spec が要求するのにコードに無い / コードにあるのに spec に無い機能、契約が表現できていない入出力、どの機能も使わない契約フィールド、GWT が観測と食い違う箇所。
 - 見つかった不整合は「docs を直す」か「これは仕様バグでは？」の判断に振り分け、**後者は人間に上げる**（コードを真実にして黙って docs を歪めない）。
 
 ### Phase R5 — テストのバックフィル
 
-- 該当 framework のテスト規約に従う（例: crow なら [testing.md](../../../rules/engineering/web/crow/testing.md) の AAA・strict アサーション・データプロバイダ・モックは境界だけ）。
+- 該当 framework のテスト規約に従う（例: crow なら [testing.md](../../rules/engineering/web/crow/testing.md) の AAA・strict アサーション・データプロバイダ・モックは境界だけ）。
 - **テストは Phase R1 の GWT と Phase R2 の契約から起こす。実装の写経にしない。**
 - レトロフィット特有の分岐: GWT はコードから逆生成したので、テストが**落ちたら**それは「逆生成 SSOT と実挙動のズレ」のシグナル。テストを緩めて通すのではなく、どちらが正しいかを人間判断に上げて解消する。
-- テスト設計は実装エージェントと別コンテキストにする（[process-agents.md](../../../rules/engineering/practices/process-agents.md) §5-F）。
+- テスト設計は実装エージェントと別コンテキストにする（[process-agents.md](../../rules/engineering/practices/process-agents.md) §5-F）。
 
 ### Phase R6 — 壊しにいく（レッドチーム）
 
@@ -72,6 +72,6 @@ description: 既存プロジェクトを claude-harness の rules に準拠さ�
 - [ ] ビルダーとオラクルを**別コンテキスト**で回し、不整合リストが空になった
 - [ ] テストを GWT / 契約から起こし、落ちたテストは「緩める」でなく人間判断で解消した
 - [ ] 攻撃・横断反証で壊れなかった（テスト緑は前提であって完成条件ではない）
-- [ ] コミット / PR は [git.md](../../../rules/engineering/conventions/git.md) に沿った（1スライス=1PR）
+- [ ] コミット / PR は [git.md](../../rules/engineering/conventions/git.md) に沿った（1スライス=1PR）
 
 > **原則:** このスキルは rules の中身をコピペしない。手順の骨格だけを持ち、判断基準は各 rules 葉に委譲する。矛盾を感じたら、コードでなく rules（＝SSOT）側を正として扱う。
