@@ -63,6 +63,24 @@ jobs:
 
 秘密情報スキャン（gitleaks）はここにジョブを足すか専用 workflow にする（[secrets.md](./secrets.md)）。
 
+### spec-lint ジョブ（docs SSOT 検証・任意）
+
+[spec-lint](./spec-lint.md) は Node ツールなので、PHP 案件でも **Node をセットアップした専用ジョブ**で回す。
+
+```yaml
+  spec:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true          # submodule 配置なら .claude-harness を取得
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate docs SSOT
+        run: node .claude/tools/spec-lint/spec-lint.mjs validate
+```
+
 ## L3 — ブランチ保護 / Ruleset
 
 CI をゲート化するには、GitHub 側で **必須ステータスチェック**に指定する必要がある（コードでは完結しない）。`gh` CLI があれば自動化できる。

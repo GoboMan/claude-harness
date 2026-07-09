@@ -27,7 +27,7 @@ L3 ブランチ保護/Ruleset : admin＋(private は)有料プランが要る   
 | テスト | [testing.md](../../web/crow/testing.md) | PHPUnit / test runner | L1・L2 | [ci.md](./ci.md) |
 | 秘密情報 | — | gitleaks（言語非依存） | L1・L2 | [secrets.md](./secrets.md) |
 | 層依存 | — | deptrac / dependency-cruiser | L1・L2 | [layer-boundaries.md](./layer-boundaries.md) |
-| 仕様フォーマット/ライフサイクル | [docs/](../docs/index.md) | spec-lint（予定・harness tool） | L1・L2 | （準備中） |
+| 仕様フォーマット/ライフサイクル | [docs/](../docs/index.md) | spec-lint（harness tool・Node） | L1・L2 | [spec-lint.md](./spec-lint.md) |
 
 ## 葉
 
@@ -36,6 +36,7 @@ L3 ブランチ保護/Ruleset : admin＋(private は)有料プランが要る   
 - **[coding-standards.md](./coding-standards.md)** — coding.md を PHPCS/ESLint で機械化（config）。
 - **[layer-boundaries.md](./layer-boundaries.md)** — 層依存を deptrac/dependency-cruiser で機械化（config）。
 - **[secrets.md](./secrets.md)** — gitleaks による秘密情報スキャン。
+- **[spec-lint.md](./spec-lint.md)** — docs SSOT のフォーマット/ライフサイクル検証（harness 同梱 Node ツール）。
 
 ## 全葉共通の前提
 

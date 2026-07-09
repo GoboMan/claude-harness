@@ -48,6 +48,17 @@ fi
 
 `git config commit.template .gitmessage`（.git/config ローカル。clone 先には自動適用されない旨を README に添える）。type 行・footer（`Refs:` / `ADR-XXXX` / `BREAKING CHANGE:` / `Co-Authored-By:`）は git.md に合わせる。
 
+### spec-lint gate（`Feature:` トレーラで draft 実装を防ぐ・任意）
+
+`Feature: F-xxx` トレーラ運用（[git.md](../git.md) footer）を入れるなら、commit-msg フックに
+[spec-lint](./spec-lint.md) の `gate` を足す（commitlint の後、または shell フックの末尾）:
+
+```bash
+node .claude/tools/spec-lint/spec-lint.mjs gate --message "$1"
+```
+
+トレーラが無いコミットは素通り（オプトイン）。対象プロジェクトに Node が要る。
+
 ## pre-commit（規約チェック＋テスト）
 
 フックから **`lint:code`（[coding-standards.md](./coding-standards.md)）** と **テスト**、任意で **`arch:check`（[layer-boundaries.md](./layer-boundaries.md)）**・**gitleaks（[secrets.md](./secrets.md)）** を走らせる。**追記は dedup する。**
@@ -62,6 +73,12 @@ vendor/bin/phpunit         # testing.md
 ```
 
 JS なら `npm run lint:code`（eslint）＋ `npm test`（＋ `npm run typecheck`）。存在しないコマンドの行は入れない。
+
+docs SSOT を機械検証するなら [spec-lint](./spec-lint.md) の `validate` も足す（Node 必須）:
+
+```bash
+node .claude/tools/spec-lint/spec-lint.mjs validate
+```
 
 ### dedup 追記の定石（複数チェックを同じフックに足すとき）
 

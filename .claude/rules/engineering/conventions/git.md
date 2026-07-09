@@ -44,6 +44,9 @@
 - **body**: なぜ変えたか・背景を書く（何を変えたかは diff を見れば分かる）。1 行 72 文字程度で折り返す。
 - **footer**:
   - 関連 issue / ADR を参照: `Refs: #123` / `ADR-0007`
+  - 対応する機能を明示: `Feature: F-001`（`docs/spec/<feature>.md` の機能ID）。この機能の spec/契約が
+    `fixed` であることを [enforcement/spec-lint.md](./enforcement/spec-lint.md) の `gate` が機械検証する
+    （draft のまま実装を進めない）。運用はオプトイン。
   - 破壊的変更: `BREAKING CHANGE: <説明>`
   - AI が関与したコミットは `Co-Authored-By:` トレーラを付けてよい（任意）。
 

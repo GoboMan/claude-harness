@@ -1,0 +1,367 @@
+#!/usr/bin/env node
+//
+//  spec-lint — docs SSOT のフォーマット / ライフサイクル検証（harness 同梱ツール）
+//
+//  検証仕様の SSOT:
+//    conventions/docs/feature-list.md   (docs/spec/features.md)
+//    conventions/docs/feature-spec.md   (docs/spec/<feature>.md)
+//    conventions/docs/contract.md       (docs/contracts/<feature>.md)
+//  強制の位置づけ: conventions/enforcement/spec-lint.md
+//
+//  使い方:
+//    node spec-lint.mjs validate [--docs docs]      全 docs を検証（フォーマット＋不変条件）
+//    node spec-lint.mjs gate --message <file>       commit メッセージの Feature: トレーラを検証
+//    node spec-lint.mjs gate --feature F-001         指定機能が fixed か検証
+//
+//  終了コード: 0=OK / 1=違反あり / 2=使い方エラー
+//
+
+import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
+import { join, basename } from "node:path";
+
+const SENTINELS = ["F-000", "YYYY-MM-DD", "<feature>"];
+
+const SPEC_SECTIONS = [
+	{ key: "目的", test: (t) => t.startsWith("目的") },
+	{ key: "アクター・権限", test: (t) => t.startsWith("アクター") },
+	{ key: "入力", test: (t) => t.startsWith("入力") },
+	{ key: "出力", test: (t) => t.startsWith("出力") },
+	{ key: "状態", test: (t) => t.startsWith("状態") },
+	{ key: "受け入れ条件", test: (t) => t.startsWith("受け入れ") },
+	{ key: "業務ルール", test: (t) => t.startsWith("業務") },
+];
+
+const CONTRACT_SECTIONS = [
+	{ key: "エンドポイント", test: (t) => t.startsWith("エンドポイント") },
+	{ key: "Request", test: (t) => /^request/i.test(t) },
+	{ key: "Response（正常）", test: (t) => /^response/i.test(t) && t.includes("正常") },
+	{ key: "Response（異常）", test: (t) => /^response/i.test(t) && t.includes("異常") },
+	{ key: "エラーコード一覧", test: (t) => t.startsWith("エラーコード") },
+	{ key: "具体例", test: (t) => t.startsWith("具体例") },
+];
+
+//  --- 収集した違反 ---
+const errors = [];
+const warns = [];
+const err = (file, msg) => errors.push({ file, msg });
+const warn = (file, msg) => warns.push({ file, msg });
+
+//  --- パーサ ---
+function parseFrontmatter(text) {
+	const lines = text.split(/\r?\n/);
+	if (lines[0] !== "---") return { data: {}, body: text, hasFm: false };
+	const data = {};
+	let i = 1;
+	for (; i < lines.length; i++) {
+		if (lines[i] === "---") {
+			i++;
+			break;
+		}
+		const m = lines[i].match(/^([^:]+):\s*(.*)$/);
+		if (m) {
+			//  行末の "# コメント" を除去
+			const val = m[2].replace(/\s+#.*$/, "").trim();
+			data[m[1].trim()] = val;
+		}
+	}
+	return { data, body: lines.slice(i).join("\n"), hasFm: true };
+}
+
+function getSections(body) {
+	const secs = [];
+	let cur = null;
+	for (const line of body.split(/\r?\n/)) {
+		const m = line.match(/^##\s+(.*)$/);
+		if (m) {
+			cur = { title: m[1].trim(), lines: [] };
+			secs.push(cur);
+		} else if (cur) {
+			cur.lines.push(line);
+		}
+	}
+	return secs;
+}
+
+function sectionFilled(sec) {
+	return sec.lines.some((l) => l.trim().length > 0);
+}
+
+function parseFeaturesTable(body) {
+	const rows = [];
+	for (const line of body.split(/\r?\n/)) {
+		const t = line.trim();
+		if (!t.startsWith("|")) continue;
+		const cells = t
+			.split("|")
+			.slice(1, -1)
+			.map((c) => c.trim());
+		const idm = cells[0] && cells[0].match(/F-\d+/);
+		if (!idm) continue; //  ヘッダ・区切り行を飛ばす
+		let link = null;
+		for (const c of cells) {
+			const lm = c.match(/\]\(([^)]+)\)/);
+			if (lm) {
+				link = lm[1];
+				break;
+			}
+		}
+		rows.push({
+			id: idm[0],
+			name: cells[1] || "",
+			status: cells[cells.length - 1],
+			link,
+		});
+	}
+	return rows;
+}
+
+function checkSentinels(file, text, status) {
+	if (status !== "fixed") return;
+	for (const s of SENTINELS) {
+		if (text.includes(s))
+			err(file, `fixed なのにテンプレのプレースホルダが残っている: "${s}"`);
+	}
+}
+
+function checkStatus(file, data) {
+	const s = data["ステータス"];
+	if (!s) {
+		err(file, "フロントマターに ステータス が無い");
+		return null;
+	}
+	if (s !== "draft" && s !== "fixed") {
+		err(file, `ステータスは draft|fixed のいずれか。実際: "${s}"`);
+	}
+	return s;
+}
+
+function checkRequiredFm(file, data, keys) {
+	for (const k of keys) {
+		if (!data[k] || data[k].length === 0) err(file, `フロントマター "${k}" が空/欠落`);
+	}
+}
+
+function checkSections(file, body, required, status) {
+	const secs = getSections(body);
+	for (const req of required) {
+		const found = secs.find((s) => req.test(s.title));
+		if (!found) {
+			err(file, `必須セクション "${req.key}" が無い`);
+		} else if (status === "fixed" && !sectionFilled(found)) {
+			err(file, `fixed なのにセクション "${req.key}" が空`);
+		}
+	}
+}
+
+//  --- ファイル種別ごとの検証 ---
+function validateFeatureSpec(file, text) {
+	const { data, body } = parseFrontmatter(text);
+	checkRequiredFm(file, data, ["機能ID", "機能名", "ステータス", "更新日"]);
+	const status = checkStatus(file, data);
+	checkSections(file, body, SPEC_SECTIONS, status);
+	checkSentinels(file, text, status);
+	//  状態セクションにハッピーパス以外が含まれるか（fixed のみ・警告）
+	if (status === "fixed") {
+		const states = getSections(body).find((s) => s.title.startsWith("状態"));
+		if (states) {
+			const joined = states.lines.join("");
+			for (const kw of ["error", "empty", "権限"]) {
+				if (!joined.includes(kw))
+					warn(file, `状態に "${kw}" 系の記述が見当たらない（feature-spec.md 参照）`);
+			}
+		}
+	}
+	return { id: data["機能ID"] || null, status };
+}
+
+function validateContract(file, text) {
+	const { data, body } = parseFrontmatter(text);
+	checkRequiredFm(file, data, ["機能ID", "機能名", "ステータス", "更新日", "機能詳細"]);
+	const status = checkStatus(file, data);
+	checkSections(file, body, CONTRACT_SECTIONS, status);
+	checkSentinels(file, text, status);
+	return { id: data["機能ID"] || null, status, specLink: data["機能詳細"] || null };
+}
+
+function listMd(dir) {
+	if (!existsSync(dir) || !statSync(dir).isDirectory()) return [];
+	return readdirSync(dir)
+		.filter((f) => f.endsWith(".md"))
+		.map((f) => join(dir, f));
+}
+
+//  --- validate コマンド ---
+function loadModel(docsDir) {
+	const specDir = join(docsDir, "spec");
+	const contractsDir = join(docsDir, "contracts");
+	const featuresFile = join(specDir, "features.md");
+
+	const specs = new Map(); //  id -> { file, status }
+	const contracts = new Map(); //  id -> { file, status, specLink }
+	let features = null;
+
+	for (const file of listMd(specDir)) {
+		if (basename(file) === "features.md") continue;
+		const res = validateFeatureSpec(file, readFileSync(file, "utf8"));
+		if (res.id) {
+			if (specs.has(res.id))
+				err(file, `機能ID "${res.id}" が重複（${specs.get(res.id).file} と）`);
+			else specs.set(res.id, { file, status: res.status });
+		}
+	}
+
+	for (const file of listMd(contractsDir)) {
+		const res = validateContract(file, readFileSync(file, "utf8"));
+		if (res.id) contracts.set(res.id, { file, status: res.status, specLink: res.specLink });
+	}
+
+	if (existsSync(featuresFile)) {
+		const { data, body } = parseFrontmatter(readFileSync(featuresFile, "utf8"));
+		checkRequiredFm(featuresFile, data, ["ステータス", "更新日"]);
+		checkStatus(featuresFile, data);
+		features = parseFeaturesTable(body);
+		if (features.length === 0) warn(featuresFile, "機能一覧テーブルに行が無い");
+	} else {
+		warn(featuresFile, "機能一覧 features.md が無い（feature-list.md 参照）");
+	}
+
+	return { specs, contracts, features, specDir, featuresFile };
+}
+
+function crossChecks(model) {
+	const { specs, contracts, features, specDir, featuresFile } = model;
+
+	//  features.md ↔ <feature>.md（状態一致・リンク整合・列挙漏れ）
+	if (features) {
+		const listed = new Set();
+		for (const row of features) {
+			listed.add(row.id);
+			const spec = specs.get(row.id);
+			if (!spec) {
+				err(featuresFile, `機能一覧の "${row.id}" に対応する spec が docs/spec に無い`);
+				continue;
+			}
+			if (row.link) {
+				const target = join(specDir, row.link.replace(/^\.\//, ""));
+				if (!existsSync(target))
+					err(featuresFile, `"${row.id}" の詳細リンクが解決しない: ${row.link}`);
+			}
+			if (row.status !== spec.status)
+				err(
+					featuresFile,
+					`"${row.id}" の状態が不一致: features.md="${row.status}" / spec="${spec.status}"`,
+				);
+		}
+		for (const [id, spec] of specs) {
+			if (!listed.has(id)) err(spec.file, `spec "${id}" が features.md に列挙されていない`);
+		}
+	}
+
+	//  contract ↔ spec（親 draft に fixed 契約は不可・親の存在）
+	for (const [id, c] of contracts) {
+		const spec = specs.get(id);
+		if (!spec) {
+			err(c.file, `契約 "${id}" に対応する spec が docs/spec に無い`);
+			continue;
+		}
+		if (c.status === "fixed" && spec.status === "draft")
+			err(
+				c.file,
+				`親 spec が draft なのに契約が fixed（先に spec を fixed にする）: ${id}`,
+			);
+	}
+}
+
+function cmdValidate(docsDir) {
+	if (!existsSync(join(docsDir, "spec"))) {
+		console.log(`spec-lint: ${docsDir}/spec が無いため検証をスキップ`);
+		return 0;
+	}
+	const model = loadModel(docsDir);
+	crossChecks(model);
+	report();
+	return errors.length > 0 ? 1 : 0;
+}
+
+//  --- gate コマンド（draft なのに実装、を防ぐ） ---
+function statusOf(docsDir, id) {
+	const spec = existsSync(join(docsDir, "spec"))
+		? listMd(join(docsDir, "spec")).find((f) => {
+				if (basename(f) === "features.md") return false;
+				return parseFrontmatter(readFileSync(f, "utf8")).data["機能ID"] === id;
+			})
+		: null;
+	const contract = existsSync(join(docsDir, "contracts"))
+		? listMd(join(docsDir, "contracts")).find(
+				(f) => parseFrontmatter(readFileSync(f, "utf8")).data["機能ID"] === id,
+			)
+		: null;
+	const st = (f) => (f ? parseFrontmatter(readFileSync(f, "utf8")).data["ステータス"] : null);
+	return { spec: st(spec), contract: st(contract), specFound: !!spec, contractFound: !!contract };
+}
+
+function gateFeature(docsDir, id) {
+	const s = statusOf(docsDir, id);
+	if (!s.specFound) {
+		err("gate", `${id}: 対応する spec が無い（docs/spec に機能詳細を作る）`);
+		return;
+	}
+	if (s.spec !== "fixed")
+		err("gate", `${id}: spec が fixed でない（draft のまま実装しない）`);
+	if (s.contractFound && s.contract !== "fixed")
+		err("gate", `${id}: 契約が fixed でない（draft のまま実装しない）`);
+}
+
+function cmdGate(docsDir, opts) {
+	let ids = [];
+	if (opts.feature) {
+		ids = [opts.feature];
+	} else if (opts.message) {
+		if (!existsSync(opts.message)) {
+			console.error(`spec-lint gate: メッセージファイルが無い: ${opts.message}`);
+			return 2;
+		}
+		const msg = readFileSync(opts.message, "utf8");
+		ids = [...msg.matchAll(/^Feature:\s*(F-\d+)/gim)].map((m) => m[1]);
+		if (ids.length === 0) {
+			//  トレーラ未使用はオプトイン。素通り（未強制）。
+			return 0;
+		}
+	} else {
+		console.error("spec-lint gate: --message <file> か --feature F-xxx が要る");
+		return 2;
+	}
+	for (const id of ids) gateFeature(docsDir, id);
+	report();
+	return errors.length > 0 ? 1 : 0;
+}
+
+//  --- 出力 ---
+function report() {
+	for (const w of warns) console.warn(`  warn  ${w.file}: ${w.msg}`);
+	for (const e of errors) console.error(`  ERROR ${e.file}: ${e.msg}`);
+	if (errors.length === 0) console.log(`spec-lint: OK（warn ${warns.length}）`);
+	else console.error(`spec-lint: ${errors.length} 件の違反`);
+}
+
+//  --- 引数 ---
+function parseArgs(argv) {
+	const opts = { docs: "docs" };
+	for (let i = 0; i < argv.length; i++) {
+		if (argv[i] === "--docs") opts.docs = argv[++i];
+		else if (argv[i] === "--message") opts.message = argv[++i];
+		else if (argv[i] === "--feature") opts.feature = argv[++i];
+	}
+	return opts;
+}
+
+function main() {
+	const [cmd, ...rest] = process.argv.slice(2);
+	const opts = parseArgs(rest);
+	if (cmd === "validate" || cmd === undefined) process.exit(cmdValidate(opts.docs));
+	if (cmd === "gate") process.exit(cmdGate(opts.docs, opts));
+	console.error("usage: spec-lint.mjs validate|gate [--docs docs] [--message f] [--feature F-001]");
+	process.exit(2);
+}
+
+main();
