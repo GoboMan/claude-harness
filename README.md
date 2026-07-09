@@ -86,7 +86,8 @@ claude-harness/
            │    ├── grilling/SKILL.md
            │    └── grill-me/SKILL.md
            └── engineering/
-                ├── retrofit-to-rules/SKILL.md          # 既存プロジェクトを rules 準拠に引き上げる
+                ├── bootstrap-project/SKILL.md          # 導入直後の起動導線（新規/既存を rules 準拠にして実装可能状態へ）
+                ├── retrofit-to-rules/SKILL.md          # 既存コードから暫定 SSOT+テストを逆生成（bootstrap が委譲）
                 └── git-guardrails-claude-code/SKILL.md # 危険な git 操作をブロック（スクリプト同梱）
 ```
 

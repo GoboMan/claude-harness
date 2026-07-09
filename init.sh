@@ -273,7 +273,9 @@ do_install()
 
   log "done."
   log "next: open the project and let the AI route via CLAUDE.md."
-  log "      to retrofit an existing codebase, trigger the 'retrofit-to-rules' skill."
+  log "      then trigger the 'bootstrap-project' skill to reach an implementable,"
+  log "      rules-compliant state (new or existing project; wires enforcement and"
+  log "      delegates code reverse-generation to 'retrofit-to-rules')."
   if [[ "${MODE}" == "submodule" ]]; then
     log "      commit the placement, then pull updates later with: ./init.sh update ${TARGET_DIR}"
   fi
