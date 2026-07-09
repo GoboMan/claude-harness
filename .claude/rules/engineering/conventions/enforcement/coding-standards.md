@@ -19,13 +19,15 @@ coding.md は **Allman（`{` を次行）** と **TAB** を要求する。**Pret
 | Allman（`{` 次行） | `brace-style:["error","allman"]` | `Generic.Functions.OpeningFunctionBraceBsdAllman`（関数）※制御構文は限定的 |
 | 80 桁 | `max-len:["error",{code:80}]` | `Generic.Files.LineLength` |
 | LF / 終端改行 | `linebreak-style`,`eol-last` | `Generic.Files.LineEndings`,`Files.EndFileNewline` |
-| `===`/`!==` | `eqeqeq:["error","always"]` | 標準 sniff に無い → カスタム/レビュー |
-| **`!` 禁止** | `no-restricted-syntax`（下記） | 標準 sniff に無い → カスタム/レビュー |
-| snake_case | `id-match`（限定的） | 標準 sniff に無い → カスタム/レビュー |
-| 引数末尾 `_` / 入力 `i_` | ❌ 既製ルール無し | ❌ 既製ルール無し |
+| `===`/`!==` | `eqeqeq:["error","always"]` | 標準 sniff に無い → レビュー |
+| **`!` 禁止** | `no-restricted-syntax`（下記） | **[php-conventions](#php-補完php-conventions)（tool）** |
+| snake_case | `id-match`（限定的） | 標準 sniff に無い → レビュー |
+| 引数末尾 `_` | ❌ 既製ルール無し | **[php-conventions](#php-補完php-conventions)（tool）** |
+| 入力 `i_` | ❌ 既製ルール無し | ❌ → レビュー |
 | PHP 短縮開始タグ禁止 | — | `Generic.PHP.DisallowShortOpenTag` |
 
-> `i_` / 引数 `_` / 制御構文 Allman / PHP の `!`・`===` は**レビュー観点**として残す（カスタム sniff 化は必要になってから）。**「全部チェックした風」にしない。**
+> **PHP の `!` と 引数 `_`** は PHPCS 標準 sniff に無いが、harness 同梱の [php-conventions](#php-補完php-conventions) で機械化する。
+> 残る **`i_` 接頭辞 / 制御構文 Allman / PHP の `===`** は誤検知が多く**レビュー観点**として残す。**「全部チェックした風」にしない。**
 
 ## PHP — `phpcs.xml.dist`
 
@@ -86,13 +88,29 @@ export default [
 
 > `id-match` の snake_case は外部シンボル/型で誤検知しうる。既存コードで大量に出たら「今直す/一旦 warn に下げ段階移行」をユーザーに確認（黙って除外しない）。
 
+## PHP 補完（php-conventions）
+
+PHPCS 標準 sniff で表現できない **`!` 禁止**・**引数末尾 `_`** を、harness 同梱の依存ゼロ Node ツール
+[`.claude/tools/php-conventions/php-conventions.mjs`](../../../../tools/php-conventions/php-conventions.mjs) で
+機械化する（文字列・コメントを除去してから正規表現走査。`!=`/`!==` は除外）。
+
+```bash
+node .claude/tools/php-conventions/php-conventions.mjs check --src src
+```
+
+- ヒューリスティックなので**オプトイン**。誤検知が出たら該当を確認（黙って無効化しない）。
+- `i_` 接頭辞・`===`（bool/null）はデータフロー/文脈依存で誤検知が多く、**引き続きレビュー観点**。
+- composer/npm script 例: `"lint:code:php": "node .claude/tools/php-conventions/php-conventions.mjs check --src src"`
+  （既存 `lint:code`〈phpcs〉と並べて実行。[setup-idempotency.md](../setup-idempotency.md) の dedup に従う）。
+
 ## ゲート接続
 
-`lint:code` を [hooks.md](./hooks.md)（pre-commit）と [ci.md](./ci.md)（CI）に繋ぐ。
+`lint:code`（phpcs/eslint）と、PHP なら php-conventions を [hooks.md](./hooks.md)（pre-commit）と [ci.md](./ci.md)（CI）に繋ぐ。
 
 ## ✅ チェックリスト
 
 - [ ] `phpcs.xml.dist` / `eslint.config.js` が対象パスに一致
 - [ ] `lint:code` が現状コードで通る（既存違反は対応方針を合意）
 - [ ] space インデント / K&R `{` / `!` が弾かれる
-- [ ] 機械化できない規約（`i_`・引数 `_`・制御構文 Allman・PHP の `!`/`===`）をレビュー観点として明示した
+- [ ] PHP は php-conventions で `!`・引数 `_` を検査した
+- [ ] なお機械化しない規約（`i_`・制御構文 Allman・PHP の `===`）をレビュー観点として明示した
