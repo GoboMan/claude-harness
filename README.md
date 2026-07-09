@@ -90,10 +90,12 @@ claude-harness/
                 └── git-guardrails-claude-code/SKILL.md # 危険な git 操作をブロック（スクリプト同梱）
 ```
 
-> 💡 **機械チェック（commit / coding / test / secret / 層 のフック・CI・ブランチ保護）は skill ではなく
+> 💡 **機械チェック（commit / coding / test / secret / 層 / 仕様 のフック・CI・ブランチ保護）は skill ではなく
 > [rules/engineering/conventions/enforcement/](.claude/rules/engineering/conventions/enforcement/index.md) に SSOT を置く。**
 > セットアップは副作用が目的で純関数化できず、rules は遅延ロードされるため、durable な知識は rules に畳む。
 > skill は「実行アセット同梱」か「多段・エージェント的手続き」のときだけ。
+> 実行アセット（バリデータ等）は `.claude/tools/` に置く: `spec-lint`（docs SSOT 検証）/
+> `php-conventions`（coding.md の `!`・引数 `_`）/ `enforcement-report`（能力・現状の検出レポート）。
 
 ## 🚀 使い方
 

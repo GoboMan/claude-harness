@@ -18,6 +18,10 @@ L3 ブランチ保護/Ruleset : admin＋(private は)有料プランが要る   
 
 **能力に応じて最大の層まで張り、届かない差分は明示する。** L3 が使えないアカウントでも L1+L2 まで効かせ、「保護は未設定」と残す（[ci.md](./ci.md) の能力劣化）。
 
+**現状把握**: 張れる層と各チェックの設定状況・ギャップは、harness 同梱ツール
+[`.claude/tools/enforcement-report/enforcement-report.sh`](../../../../tools/enforcement-report/enforcement-report.sh)
+が検出してレポートする（`--out docs/enforcement.md`）。読み取り専用。
+
 ## チェック → 層 → ツール（対応表）
 
 | チェック | SSOT | ツール（PHP / JS） | 主な層 | 葉 |
