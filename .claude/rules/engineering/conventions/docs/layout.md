@@ -35,13 +35,13 @@ docs/
 
 ## spec/（SSOT）
 
-- `features.md` に全機能を漏れなく列挙する（process.md Phase 1）。
-- 機能ごとに `<feature>.md` を作り、機能詳細と **反証可能な GWT 受け入れ条件**を書く。ハッピーパスだけでなく失敗・空・権限・境界も含める。
+- `features.md` に全機能を漏れなく列挙する（process.md Phase 1）。**書式は [feature-list.md](./feature-list.md)。**
+- 機能ごとに `<feature>.md` を作り、機能詳細と **反証可能な GWT 受け入れ条件**を書く。ハッピーパスだけでなく失敗・空・権限・境界も含める。**書式は [feature-spec.md](./feature-spec.md)。**
 - 実装方法には踏み込まない（仕様は実装非依存）。
 
 ## contracts/（処理インターフェース契約）
 
-- UI と処理の境界＝各機能の request / response の形を、実装前に固定する（process.md Phase 3・コア制約 6）。
+- UI と処理の境界＝各機能の request / response の形を、実装前に固定する（process.md Phase 3・コア制約 6）。**書式は [contract.md](./contract.md)。**
 - 1 機能 1 契約。UI 実装・処理実装・テスト設計はこの契約だけを拠り所にする。
 - ※ OpenAPI 等のコード資産で契約を表現する場合は、その所在を `contracts/<feature>.md` から参照する形でもよい。
 
