@@ -86,6 +86,47 @@ function sectionFilled(sec) {
 	return sec.lines.some((l) => l.trim().length > 0);
 }
 
+function findSection(body, test) {
+	return getSections(body).find((s) => test(s.title));
+}
+
+//  マークダウン表の1列目（＝名前列）を拾う。ヘッダ行（＝最初の行）・区切り行は
+//  位置で除外する（キーワード判定にすると "name" 等の実パラメータ名を誤って落とす）。
+function tableFirstColumn(lines) {
+	const names = [];
+	let seenHeader = false;
+	for (const line of lines) {
+		const t = line.trim();
+		if (!t.startsWith("|")) continue;
+		const cells = t
+			.split("|")
+			.slice(1, -1)
+			.map((c) => c.trim());
+		const first = cells[0] || "";
+		if (/^:?-{2,}:?$/.test(first)) continue; //  区切り行
+		if (!seenHeader) {
+			seenHeader = true; //  最初の非区切り行＝ヘッダ
+			continue;
+		}
+		if (!first) continue;
+		names.push(first);
+	}
+	return names;
+}
+
+//  入力名/リクエスト名の突き合わせ用に正規化（crow の i_ 接頭辞を吸収）
+function normName(n) {
+	return n
+		.replace(/`/g, "")
+		.trim()
+		.replace(/^i_/, "")
+		.toLowerCase();
+}
+
+function countTableRows(lines) {
+	return tableFirstColumn(lines).length;
+}
+
 function parseFeaturesTable(body) {
 	const rows = [];
 	for (const line of body.split(/\r?\n/)) {
@@ -161,17 +202,17 @@ function validateFeatureSpec(file, text) {
 	checkSections(file, body, SPEC_SECTIONS, status);
 	checkSentinels(file, text, status);
 	//  状態セクションにハッピーパス以外が含まれるか（fixed のみ・警告）
-	if (status === "fixed") {
-		const states = getSections(body).find((s) => s.title.startsWith("状態"));
-		if (states) {
-			const joined = states.lines.join("");
-			for (const kw of ["error", "empty", "権限"]) {
-				if (!joined.includes(kw))
-					warn(file, `状態に "${kw}" 系の記述が見当たらない（feature-spec.md 参照）`);
-			}
+	const states = findSection(body, (t) => t.startsWith("状態"));
+	const statesText = states ? states.lines.join("") : "";
+	if (status === "fixed" && states) {
+		for (const kw of ["error", "empty", "権限"]) {
+			if (!statesText.includes(kw))
+				warn(file, `状態に "${kw}" 系の記述が見当たらない（feature-spec.md 参照）`);
 		}
 	}
-	return { id: data["機能ID"] || null, status };
+	const inputSec = findSection(body, (t) => t.startsWith("入力"));
+	const inputs = inputSec ? tableFirstColumn(inputSec.lines) : [];
+	return { id: data["機能ID"] || null, status, inputs, statesText };
 }
 
 function validateContract(file, text) {
@@ -180,7 +221,17 @@ function validateContract(file, text) {
 	const status = checkStatus(file, data);
 	checkSections(file, body, CONTRACT_SECTIONS, status);
 	checkSentinels(file, text, status);
-	return { id: data["機能ID"] || null, status, specLink: data["機能詳細"] || null };
+	const reqSec = findSection(body, (t) => /^request/i.test(t));
+	const requestParams = reqSec ? tableFirstColumn(reqSec.lines) : [];
+	const errSec = findSection(body, (t) => /^response/i.test(t) && t.includes("異常"));
+	const errorRows = errSec ? countTableRows(errSec.lines) : 0;
+	return {
+		id: data["機能ID"] || null,
+		status,
+		specLink: data["機能詳細"] || null,
+		requestParams,
+		errorRows,
+	};
 }
 
 function listMd(dir) {
@@ -206,13 +257,26 @@ function loadModel(docsDir) {
 		if (res.id) {
 			if (specs.has(res.id))
 				err(file, `機能ID "${res.id}" が重複（${specs.get(res.id).file} と）`);
-			else specs.set(res.id, { file, status: res.status });
+			else
+				specs.set(res.id, {
+					file,
+					status: res.status,
+					inputs: res.inputs,
+					statesText: res.statesText,
+				});
 		}
 	}
 
 	for (const file of listMd(contractsDir)) {
 		const res = validateContract(file, readFileSync(file, "utf8"));
-		if (res.id) contracts.set(res.id, { file, status: res.status, specLink: res.specLink });
+		if (res.id)
+			contracts.set(res.id, {
+				file,
+				status: res.status,
+				specLink: res.specLink,
+				requestParams: res.requestParams,
+				errorRows: res.errorRows,
+			});
 	}
 
 	if (existsSync(featuresFile)) {
@@ -257,7 +321,7 @@ function crossChecks(model) {
 		}
 	}
 
-	//  contract ↔ spec（親 draft に fixed 契約は不可・親の存在）
+	//  contract ↔ spec（親 draft に fixed 契約は不可・親の存在・入出力の相互整合）
 	for (const [id, c] of contracts) {
 		const spec = specs.get(id);
 		if (!spec) {
@@ -269,7 +333,31 @@ function crossChecks(model) {
 				c.file,
 				`親 spec が draft なのに契約が fixed（先に spec を fixed にする）: ${id}`,
 			);
+		crossConsistency(id, spec, c);
 	}
+}
+
+//  構造整合オラクル相当（ヒューリスティック・warn 中心）:
+//  機能詳細の入力 ↔ 契約の Request、機能詳細の異常状態 ↔ 契約の異常 Response。
+//  名前は i_ 接頭辞を吸収して突き合わせる。名付けの揺れで誤検知しうるため warn。
+function crossConsistency(id, spec, c) {
+	const specIn = new Set(spec.inputs.map(normName));
+	const reqIn = new Set(c.requestParams.map(normName));
+
+	for (const n of specIn)
+		if (!reqIn.has(n))
+			warn(c.file, `${id}: 機能詳細の入力 "${n}" が契約 Request に見当たらない`);
+	for (const n of reqIn)
+		if (!specIn.has(n))
+			warn(c.file, `${id}: 契約 Request の "${n}" が機能詳細の入力に見当たらない`);
+
+	//  機能詳細が error/権限/境界 の異常状態を持つのに、契約の異常 Response が空
+	const hasAbnormalState = /error|権限|境界/.test(spec.statesText);
+	if (hasAbnormalState && c.errorRows === 0)
+		warn(
+			c.file,
+			`${id}: 機能詳細に異常状態があるが契約の「Response（異常）」に行が無い`,
+		);
 }
 
 function cmdValidate(docsDir) {
