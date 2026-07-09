@@ -31,18 +31,22 @@ pre-commit フックはローカルに gitleaks が入っている前提にな�
 
 ### 2. pre-commit フックに接続する
 
-`setup-pre-commit`（Husky）導入済みかを確認する。
+`setup-pre-commit` 導入済みか、そのフック方式（Husky か `core.hooksPath` か）を確認する。次の行を
+**既存フックに追記**する（既存行は消さない）:
 
-- **導入済み** → `.husky/pre-commit` に次の行を追記する（既存行は消さない）:
+```
+gitleaks protect --staged --redact --verbose
+```
 
-  ```
-  gitleaks protect --staged --redact --verbose
-  ```
+- `protect --staged` はステージ済みの差分だけを走査するので高速
+- `--redact` は検出値をログに出さない（二次漏洩防止）
 
-  - `protect --staged` はステージ済みの差分だけを走査するので高速
-  - `--redact` は検出値をログに出さない（二次漏洩防止）
+追記先はフック方式で分かれる。
 
-- **未導入** → 先に `setup-pre-commit` を使うか、gitleaks 単独の最小フックを作るかをユーザーに確認する。
+- **Husky（Node）** → `.husky/pre-commit` に追記
+- **core.hooksPath（純 PHP / Node 非依存）** → `.githooks/pre-commit` に追記
+- **pre-commit 未導入** → 先に `setup-pre-commit` を使うか、gitleaks 単独の最小フック（上記1行だけの
+  `.githooks/pre-commit` ＋ `git config core.hooksPath .githooks`）を作るかをユーザーに確認する。
 
 ### 3. CI に接続する
 

@@ -29,11 +29,12 @@ description: レイヤー間の依存方向（例 View→ScreenModel→UseCase�
 
 ### 1. スタックを検出する
 
+- **PHP（crow）** → **deptrac**（`composer.json` / `*.php` を検出）
 - **TypeScript / JavaScript** → dependency-cruiser（既定）または eslint-plugin-boundaries
 - **Python** → import-linter
 - **Java / Kotlin** → ArchUnit（テストとして記述）
 
-以降は主対象の **TS/JS + dependency-cruiser** を詳述する。他言語は末尾の「他言語」を参照。
+以降は **TS/JS + dependency-cruiser** を詳述する。PHP は「PHP（deptrac）」節、その他は末尾「他言語」を参照。
 
 ### 2. 層とルールを確定する
 
@@ -128,6 +129,61 @@ CI層は回避不可のため、少なくとも CI での実行を推奨する�
 ### 8. コミットする
 
 変更・作成した全ファイルをステージしてコミットする: `chore: enforce layer boundaries with dependency-cruiser`
+
+## PHP（deptrac）
+
+crow など PHP プロジェクトでは **deptrac** で同じ「層と許可依存を宣言 → 逆流を弾く」を実現する。
+
+依存（Composer・devDependency）:
+
+```
+qossmic/deptrac-shim
+```
+
+`deptrac.yaml` を生成する。層＝ディレクトリを collector で束ね、`ruleset` で **許可する依存先だけ**を列挙する
+（列挙外はすべて違反になる）。**実際のディレクトリに置き換えること。**
+
+```yaml
+deptrac:
+  paths:
+    - ./src
+  layers:
+    - name: Controller
+      collectors:
+        - type: directory
+          value: src/controller/.*
+    - name: Service
+      collectors:
+        - type: directory
+          value: src/service/.*
+    - name: Repository
+      collectors:
+        - type: directory
+          value: src/repository/.*
+    - name: Domain
+      collectors:
+        - type: directory
+          value: src/domain/.*
+  ruleset:
+    Controller:
+      - Service
+    Service:
+      - Repository
+      - Domain
+    Repository:
+      - Domain
+    Domain: ~   # Domain は何にも依存しない（許可先なし）
+```
+
+composer script と検証:
+
+```json
+{ "scripts": { "arch:check": "deptrac analyse --fail-on-uncovered" } }
+```
+
+- `--fail-on-uncovered` で「どの層にも属さないファイル」も検出し、宣言漏れを塞ぐ。
+- ゲート接続は TS/JS と同じ（pre-commit に `composer run arch:check` / CI の PHP ジョブに `arch:check` ステップ）。
+- 逆流（例 `Domain` から `Service` を使う）を試しに書いて、`deptrac analyse` が違反で落ちることを確認する。
 
 ## 補足
 

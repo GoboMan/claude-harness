@@ -1,91 +1,90 @@
 ---
 name: setup-pre-commit
-description: 現在のリポジトリに、lint-staged（Prettier）、型チェック、テストを備えた Husky の pre-commit フックをセットアップする。ユーザーが pre-commit フックを追加したい、Husky をセットアップしたい、lint-staged を設定したい、あるいはコミット時のフォーマット／型チェック／テストを追加したい場合に使用する。
+description: 現在のリポジトリに、スタック（PHP/crow は PHPCS＋PHPUnit、JS/TS は ESLint）に応じた pre-commit フックをセットアップする。コミット時にコーディング規約チェック・テストを走らせたい、Husky もしくは Node 非依存の core.hooksPath でフックを入れたい場合に使用する。
 ---
 
 # Setup Pre-Commit Hooks
 
+コミット前に **コーディング規約チェックとテスト**を走らせるローカルゲートをセットアップする。
+このリポジトリの規約（[coding.md](../../../rules/engineering/web/crow/coding.md) /
+[testing.md](../../../rules/engineering/web/crow/testing.md)）に沿わせるため、**スタックを検出して道具を分ける**。
+
+> ⚠️ **Prettier は使わない。** coding.md は Allman＋TAB を要求するが Prettier は Allman を出せず TAB も既定で
+> 潰す。規約の機械チェックは `enforce-coding-standards`（PHP=PHPCS / JS=ESLint）に委譲する。本スキルは
+> その `lint:code` とテストを **フックに接続する**役。
+
 ## このスキルがセットアップするもの
 
-- **Husky** の pre-commit フック
-- ステージ済みの全ファイルに対して Prettier を実行する **lint-staged**
-- **Prettier** の設定（存在しない場合）
-- pre-commit フック内での **typecheck** および **test** スクリプト
+- pre-commit フック（Husky もしくは Node 非依存の `core.hooksPath`）
+- フックから **`lint:code`（規約チェック）** と **テスト** を実行
+- 規約チェック本体（phpcs / eslint 設定）は `enforce-coding-standards` が用意する（未導入なら先に案内）
 
 ## 手順
 
-### 1. パッケージマネージャーを検出する
+### 1. スタックとフック方式を検出する
 
-`package-lock.json`（npm）、`pnpm-lock.yaml`（pnpm）、`yarn.lock`（yarn）、`bun.lockb`（bun）の有無を確認する。存在するものを使用する。判別できない場合は npm をデフォルトとする。
+- `composer.json` / `*.php` → **PHP（crow）**：テストは PHPUnit（`vendor/bin/phpunit`）
+- `package.json` → **JS/TS**：テストは package.json の `test` スクリプト
+- **フック方式**:
+  - `package.json` があり Node が使える → **Husky**
+  - 純 PHP など Node を入れたくない → **`core.hooksPath`**（Node 非依存・後述）
 
-### 2. 依存関係をインストールする
+### 2. 規約チェック（lint:code）を用意する
 
-devDependencies としてインストールする。
+`enforce-coding-standards` が生成する `lint:code`（PHP=`phpcs` / JS=`eslint`）を前提にする。
+未導入なら **先に `enforce-coding-standards` を実行**するようユーザーに案内する。
 
-```
-husky lint-staged prettier
-```
-
-### 3. Husky を初期化する
+### 3A. Husky でフックを作る（Node プロジェクト）
 
 ```bash
 npx husky init
 ```
 
-これにより `.husky/` ディレクトリが作成され、package.json に `prepare: "husky"` が追加される。
-
-### 4. `.husky/pre-commit` を作成する
-
-このファイルを書き込む（Husky v9 以降では shebang は不要）。
+`.husky/pre-commit` に書き込む（Husky v9+ は shebang 不要）:
 
 ```
-npx lint-staged
-npm run typecheck
+npm run lint:code
 npm run test
 ```
 
-**適宜調整する**: `npm` を検出したパッケージマネージャーに置き換える。リポジトリの package.json に `typecheck` や `test` スクリプトが存在しない場合は、該当する行を省略し、その旨をユーザーに伝える。
+`typecheck` スクリプトがあれば行を足す。存在しないスクリプトの行は省き、その旨を伝える。
 
-### 5. `.lintstagedrc` を作成する
+### 3B. core.hooksPath でフックを作る（純 PHP / Node 非依存）
 
-```json
-{
-  "*": "prettier --ignore-unknown --write"
-}
+Husky（Node）を入れずに、**リポジトリに commit するフック**で同じことをする。
+
+```bash
+mkdir -p .githooks
+git config core.hooksPath .githooks
 ```
 
-### 6. `.prettierrc` を作成する（存在しない場合）
+`.githooks/pre-commit`（`chmod +x`）:
 
-Prettier の設定が存在しない場合にのみ作成する。次のデフォルト値を使用する。
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-```json
-{
-  "useTabs": false,
-  "tabWidth": 2,
-  "printWidth": 80,
-  "singleQuote": false,
-  "trailingComma": "es5",
-  "semi": true,
-  "arrowParens": "always"
-}
+composer run lint:code
+vendor/bin/phpunit
 ```
 
-### 7. 検証する
+> `core.hooksPath` はリポジトリに `.githooks/` を含められるので、clone した他者にも配れる（`.git/hooks`
+> と違い共有可能）。ただし各自 `git config core.hooksPath .githooks` の実行が要る旨を README に添える。
 
-- [ ] `.husky/pre-commit` が存在し、実行可能になっている
-- [ ] `.lintstagedrc` が存在する
-- [ ] package.json の `prepare` スクリプトが `"husky"` になっている
-- [ ] Prettier の設定が存在する
-- [ ] `npx lint-staged` を実行して動作を確認する
+### 4. 検証する
 
-### 8. コミットする
+- [ ] フック（`.husky/pre-commit` または `.githooks/pre-commit`）が存在し実行可能
+- [ ] `lint:code`（phpcs/eslint）が呼ばれている ＝ `enforce-coding-standards` と接続済み
+- [ ] テスト（PHPUnit / npm test）が呼ばれている
+- [ ] 規約違反（space インデント等）やテスト失敗で commit が止まる
 
-変更・作成した全ファイルをステージし、次のメッセージでコミットする: `Add pre-commit hooks (husky + lint-staged + prettier)`
+### 5. コミットする
 
-このコミットによって新しい pre-commit フックが実行されるため、すべてが正しく動作するかの良いスモークテストになる。
+`chore: add pre-commit hook (lint:code + tests)`
 
 ## 補足
 
-- Husky v9 以降ではフックファイルに shebang は不要
-- `prettier --ignore-unknown` は Prettier がパースできないファイル（画像など）をスキップする
-- pre-commit ではまず lint-staged（高速で、ステージ済みファイルのみ）を実行し、続いて型チェックとテスト全体を実行する
+- pre-commit は `--no-verify` で回避できる **一次防衛**。回避不可の裏取りは `setup-ci-checks`（CI）で行う。
+- コミットメッセージ規約は関心事が別。`setup-commitlint`（commit-msg フック）を使う。
+- 秘密情報スキャンを足すなら `setup-secret-scanning` をこのフックに接続する。
+- process.md の通り **フック緑は前提であって完成条件ではない**。最後は攻撃（レッドチーム）で壊しにいく。

@@ -93,3 +93,11 @@ echo '{"tool_input":{"command":"git push origin main"}}' | <path-to-script>
 ```
 
 終了コード 2 で終了し、stderr に BLOCKED メッセージが出力されるはずである。
+
+## 補足：git.md フローとの関係
+
+このフックは `git push` を**全面ブロック**する（Claude が勝手に push しない安全網）。
+[git.md](../../../rules/engineering/conventions/git.md) は「PR は 1 スライス単位」で push / PR を回す運用なので、
+push 自体は**人間が明示的に行う**前提と噛み合う。逆に「Claude に push まで任せたい」運用では邪魔になるため、
+スコープ（プロジェクト / グローバル）とブロック対象は導入時にユーザーへ確認する。CI の必須チェックや
+ブランチ保護（`setup-ci-checks`）とは目的が別（あちらはサーバ側ゲート、これは手元の事故防止）。
