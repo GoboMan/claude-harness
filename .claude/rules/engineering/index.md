@@ -41,6 +41,7 @@
 | コミット / PR を書く | `conventions/git.md` |
 | docs / ADR の配置を決める | `conventions/docs/index.md` → `layout.md` |
 | 機能詳細(SSOT)を書く | `conventions/docs/index.md` → `feature-spec.md` |
+| 機械チェック（フック / CI / ブランチ保護）を設定する | `conventions/enforcement/index.md` → 該当葉（＋ `conventions/setup-idempotency.md`） |
 | バグ修正 | 核（＋ 該当プラットフォーム / framework） |
 
 > **原則:** このカタログには規約の中身をコピペしない。詳細は各カタログ／ケース Markdown に閉じ込める。

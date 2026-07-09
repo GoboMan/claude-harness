@@ -86,15 +86,14 @@ claude-harness/
            │    ├── grilling/SKILL.md
            │    └── grill-me/SKILL.md
            └── engineering/
-                ├── retrofit-to-rules/SKILL.md       # 既存プロジェクトを rules 準拠に引き上げる
-                ├── enforce-coding-standards/SKILL.md # coding.md を PHPCS/ESLint で機械強制
-                ├── enforce-layer-boundaries/SKILL.md # 層依存を deptrac/dep-cruiser で強制
-                ├── setup-commitlint/SKILL.md         # commit 規約(git.md)を機械強制
-                ├── setup-pre-commit/SKILL.md         # コミット前ゲート(lint:code + test)
-                ├── setup-ci-checks/SKILL.md          # CI で回避不可の最終ゲート
-                ├── setup-secret-scanning/SKILL.md    # gitleaks で秘密情報混入を弾く
-                └── git-guardrails-claude-code/SKILL.md # 危険な git 操作をブロック
+                ├── retrofit-to-rules/SKILL.md          # 既存プロジェクトを rules 準拠に引き上げる
+                └── git-guardrails-claude-code/SKILL.md # 危険な git 操作をブロック（スクリプト同梱）
 ```
+
+> 💡 **機械チェック（commit / coding / test / secret / 層 のフック・CI・ブランチ保護）は skill ではなく
+> [rules/engineering/conventions/enforcement/](.claude/rules/engineering/conventions/enforcement/index.md) に SSOT を置く。**
+> セットアップは副作用が目的で純関数化できず、rules は遅延ロードされるため、durable な知識は rules に畳む。
+> skill は「実行アセット同梱」か「多段・エージェント的手続き」のときだけ。
 
 ## 🚀 使い方
 

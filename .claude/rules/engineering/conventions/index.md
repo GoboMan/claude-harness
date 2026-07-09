@@ -11,6 +11,14 @@
   commit メッセージ（Conventional Commits）と PR テンプレート。PR は 1 スライス単位。
   コミットする／PR を作るときに開く。
 
+- **[enforcement](enforcement/index.md)** → `enforcement/index.md`
+  規約を機械的に強制する SSOT（3層モデル・チェック→ツール対応・config）。commit/coding/test/secret/層 の
+  フック・CI・ブランチ保護を設定するときに開く。
+
+- **[セットアップ冪等性規約](setup-idempotency.md)** → `setup-idempotency.md`
+  config 生成・フック導入を「冪等・自己完結・非破壊・スコープ閉じ」に保つ4原則と共有資源の dedup。
+  設定を伴う作業（enforcement / 設定系 skill）で開く。
+
 <!--
   ▼ 規約カタログ／葉を追加したらここに 2 行で追記する。
     まとまり（docs のような）はサブフォルダ＋index.md にし、単発は直下の *.md に置く。

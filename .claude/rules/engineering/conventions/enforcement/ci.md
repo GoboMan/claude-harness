@@ -1,0 +1,91 @@
+# 📦 enforcement — L2 CI ＋ L3 ブランチ保護
+
+> ローカルフック（[hooks.md](./hooks.md)）は `--no-verify` で回避でき環境にも依存する。CI は**回避不能・全員に必ず効く最終ゲート**。
+> スタック（PHP/crow か JS/TS か）を検出してジョブを分ける。config 生成は [setup-idempotency.md](../setup-idempotency.md) に従い、既存 `.github/workflows/*.yml` を clobber しない。
+
+## L2 — GitHub Actions
+
+`.github/workflows/ci.yml`。PR（`pull_request`）と主要ブランチへの push で発火。**存在するコマンドだけ**含める。
+
+### PHP（crow）ジョブ
+
+```yaml
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  php:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+      - run: composer install --prefer-dist --no-progress
+      - name: Coding standards
+        run: composer run lint:code    # PHPCS（coding.md）
+      - name: Test
+        run: vendor/bin/phpunit        # testing.md
+      - name: Architecture check       # layer-boundaries 導入時のみ
+        run: composer run arch:check   # deptrac
+```
+
+### JS/TS ジョブ
+
+パッケージマネージャーを検出（`package-lock.json`=npm / `pnpm-lock.yaml`=pnpm / `yarn.lock`=yarn / `bun.lockb`=bun。不明なら npm）。npm 例:
+
+```yaml
+  js:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Coding standards
+        run: npm run lint:code    # ESLint（coding.md）
+      - name: Type check
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Architecture check
+        run: npm run arch:check   # dependency-cruiser
+```
+
+- pnpm → `pnpm/action-setup` ＋ `cache: pnpm` / `pnpm install --frozen-lockfile`
+- yarn → `cache: yarn` / `yarn install --frozen-lockfile`
+- bun → `oven-sh/setup-bun` / `bun install --frozen-lockfile`
+
+秘密情報スキャン（gitleaks）はここにジョブを足すか専用 workflow にする（[secrets.md](./secrets.md)）。
+
+## L3 — ブランチ保護 / Ruleset
+
+CI をゲート化するには、GitHub 側で **必須ステータスチェック**に指定する必要がある（コードでは完結しない）。`gh` CLI があれば自動化できる。
+
+```bash
+gh api -X PUT repos/{owner}/{repo}/branches/main/protection \
+  -F required_status_checks.strict=true \
+  -F 'required_status_checks.contexts[]=php' \
+  -F 'required_status_checks.contexts[]=js' \
+  ...
+```
+
+- `contexts[]` には**必須化したいジョブ名**を列挙（上記なら `php` / `js`。片方だけなら片方）。
+- 設定変更なので、実行は**ユーザーの承認を得てから**。
+
+### 能力劣化（アカウントで L3 が張れないとき）
+
+- プライベートリポジトリのブランチ保護は**有料プラン**、Ruleset/保護の設定には **admin 権限**が要る。
+- 使えないときは **L1（フック）＋L2（CI 実行）まで**に留め、「**保護は未設定**（直 push を機械的に封じられない）」と明示的に残す。黙って「守られている」風にしない。
+
+## ✅ チェックリスト
+
+- [ ] スタックに合うジョブ（PHP は PHPUnit、JS は test）になっている
+- [ ] `.github/workflows/*.yml` を既存分と衝突させず生成した
+- [ ] 依存インストールは lockfile 厳守（`composer install` / `npm ci`）
+- [ ] L3 を張れたか。張れないなら「保護未設定」を記録したか
