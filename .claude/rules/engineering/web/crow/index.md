@@ -4,6 +4,16 @@
 > crow 固有の規約・実装ルール・テスト設計を、**関心ごとの葉（`.md`）として必要になった時に生やす**。
 > あなた（AI）は、タスクに関係する葉だけを開くこと。
 
+## ⛔ 書く前に：実装着手ゲート
+
+> **coding.md / testing.md を開く前に、必ずここを通す。**
+> crow のコードを書く／直す前に、対象機能が `docs/spec/features.md` に載っており、
+> `docs/spec/<feature>.md` と `docs/contracts/<feature>.md` が **`fixed`** かを確認する。
+> **1つでも欠けたら実装しない。** [practices/process.md](../../practices/process.md) の
+> **§1.5 実装着手ゲート**に従い Phase 1（定義）へ戻る。
+> 「既存パターンに似た小さな CRUD」も「ユーザーが実装を頼んだ」も免除にならない。
+> ゲートを通した後に、下記の style / test 規約を開くこと。
+
 ## 📦 crow のルール
 
 - **[コーディング規約](./coding.md)** → `./coding.md`

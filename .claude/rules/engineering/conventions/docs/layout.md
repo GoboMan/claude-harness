@@ -82,6 +82,8 @@ NNNN-YYYY-MM-DD-title.md
 
 ## ✅ ドキュメント着手前チェックリスト
 
+> 実装に入る前の停止線は [process.md](../../practices/process.md) の **§1.5 実装着手ゲート**（features 収録 / spec `fixed` / 契約 `fixed`）。本チェックリストはその中身にあたる。
+
 - [ ] 実装より先に `docs/spec/` の機能一覧・GWT を用意したか
 - [ ] UI/処理に着手する前に `docs/contracts/` の契約を固定したか
 - [ ] 設計上の重要な決定を `docs/adr/` に残したか（番号＋日付のファイル名で）
