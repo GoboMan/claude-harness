@@ -1,3 +1,8 @@
+---
+paths:
+  - "docs/spec/features.md"
+---
+
 # 📦 機能一覧の厳格フォーマット
 
 > 機能一覧は **`docs/spec/features.md`** に置く、**全機能を漏れなく列挙した目次**（process.md Phase 1 の最初の成果物）。
