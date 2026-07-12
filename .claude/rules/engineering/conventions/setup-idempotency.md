@@ -1,3 +1,19 @@
+---
+paths:
+  - ".husky/**"
+  - ".githooks/**"
+  - ".github/workflows/**"
+  - "commitlint.config.*"
+  - "phpcs.xml*"
+  - "eslint.config.*"
+  - ".eslintrc*"
+  - "deptrac.yaml"
+  - ".dependency-cruiser.*"
+  - ".gitleaks.toml"
+  - "package.json"
+  - "composer.json"
+---
+
 # 📦 セットアップ冪等性規約（何度流しても・併用しても壊れない）
 
 > config 生成・フック導入・ツール設定などの**セットアップ作業は副作用が目的**なので純関数にはなり得ない。

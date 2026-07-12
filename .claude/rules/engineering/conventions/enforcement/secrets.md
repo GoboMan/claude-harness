@@ -1,3 +1,11 @@
+---
+paths:
+  - ".gitleaks.toml"
+  - ".husky/**"
+  - ".githooks/**"
+  - ".github/workflows/**"
+---
+
 # 📦 enforcement — 秘密情報スキャン（gitleaks）
 
 > APIキー・トークン・秘密鍵などの混入を**機械的に検知して弾く**。gitleaks（言語非依存の単一バイナリ・正規表現＋エントロピー）を L1（pre-commit）と L2（CI）の両層に仕込む。

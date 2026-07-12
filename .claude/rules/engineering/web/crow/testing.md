@@ -1,3 +1,11 @@
+---
+paths:
+  - "**/*Test.php"
+  - "tests/**"
+  - "phpunit.xml"
+  - "phpunit.xml.dist"
+---
+
 # 📦 crow — テスト設計（PHPUnit）
 
 > crow のテストは **PHPUnit** を使う。ここでは最低限のベストプラクティスを定める。

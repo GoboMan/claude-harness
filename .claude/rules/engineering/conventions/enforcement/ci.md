@@ -1,3 +1,8 @@
+---
+paths:
+  - ".github/workflows/**"
+---
+
 # 📦 enforcement — L2 CI ＋ L3 ブランチ保護
 
 > ローカルフック（[hooks.md](./hooks.md)）は `--no-verify` で回避でき環境にも依存する。CI は**回避不能・全員に必ず効く最終ゲート**。

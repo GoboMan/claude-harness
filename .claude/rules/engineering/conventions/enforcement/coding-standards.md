@@ -1,3 +1,12 @@
+---
+paths:
+  - "phpcs.xml*"
+  - "eslint.config.*"
+  - ".eslintrc*"
+  - "package.json"
+  - "composer.json"
+---
+
 # 📦 enforcement — コーディング規約の機械化（PHPCS / ESLint）
 
 > [coding.md](../../web/crow/coding.md)（SSOT）を機械可読なルールセットに落として強制する。

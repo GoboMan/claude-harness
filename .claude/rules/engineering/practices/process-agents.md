@@ -1,3 +1,9 @@
+---
+paths:
+  - "docs/spec/**"
+  - "docs/contracts/**"
+---
+
 # AI駆動開発プロセス — 実行台本（フェーズ実行時にロード）
 
 > このドキュメントは [process.md](./process.md)（核）の続きで、**実行の詳細**を収める。

@@ -14,6 +14,11 @@
 > 「既存パターンに似た小さな CRUD」も「ユーザーが実装を頼んだ」も免除にならない。
 > ゲートを通した後に、下記の style / test 規約を開くこと。
 
+> ⚠️ **将来 2つ目の PHP framework（Laravel 等）を導入するとき:** coding.md / testing.md は
+> `paths: **/*.php` で条件ロードしている。別 framework の `.php` にも crow 規約（Allman・TAB・snake_case・
+> 引数末尾 `_`・`!` 禁止）が誤適用され**スタイルを誤らせる（correctness 退行）**。その際は crow の
+> coding/testing を crow 開発 skill へ切り出すか、framework 判別子（ディレクトリ限定の glob 等）を入れること。
+
 ## 📦 crow のルール
 
 - **[コーディング規約](./coding.md)** → `./coding.md`

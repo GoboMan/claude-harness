@@ -1,3 +1,12 @@
+---
+paths:
+  - "docs/spec/**"
+  - "docs/contracts/**"
+  - ".husky/**"
+  - ".githooks/**"
+  - ".github/workflows/**"
+---
+
 # 📦 enforcement — 仕様フォーマット / ライフサイクルの機械化（spec-lint）
 
 > docs の SSOT（機能一覧・機能詳細・契約）が**厳格フォーマットに従い、ライフサイクル（draft→fixed）が破られていない**かを機械検証する。

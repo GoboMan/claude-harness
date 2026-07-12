@@ -1,3 +1,11 @@
+---
+paths:
+  - ".husky/**"
+  - ".githooks/**"
+  - "commitlint.config.*"
+  - ".gitmessage"
+---
+
 # 📦 enforcement — L1 ローカルフック（commit-msg / pre-commit）
 
 > コミット前・コミット時に手元で走らせる**一次防衛**。`--no-verify` で回避できるので、回避不能の裏取りは [ci.md](./ci.md)（L2）で行う。

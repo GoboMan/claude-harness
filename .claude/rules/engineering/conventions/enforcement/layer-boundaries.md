@@ -1,3 +1,10 @@
+---
+paths:
+  - "deptrac.yaml"
+  - "deptrac.yml"
+  - ".dependency-cruiser.*"
+---
+
 # 📦 enforcement — 層依存の機械化（deptrac / dependency-cruiser）
 
 > レイヤー間の**許可される依存方向を宣言し、逆流・層飛ばしを弾く**。設計を助言するのでなく「決めた境界を破ったら止める」強制。
