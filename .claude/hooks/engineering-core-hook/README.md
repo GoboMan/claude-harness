@@ -38,9 +38,9 @@
 
 ```bash
 echo '{"prompt":"crow で予約フォームを実装して","session_id":"t1"}' \
-  | node .claude/tools/engineering-core-hook/hook.mjs        # → core が出る
+  | node .claude/hooks/engineering-core-hook/hook.mjs        # → core が出る
 echo '{"prompt":"crow で予約フォームを実装して","session_id":"t1"}' \
-  | node .claude/tools/engineering-core-hook/hook.mjs        # → 2回目は無出力(dedup)
+  | node .claude/hooks/engineering-core-hook/hook.mjs        # → 2回目は無出力(dedup)
 echo '{"prompt":"週末の天気は？","session_id":"t2"}' \
-  | node .claude/tools/engineering-core-hook/hook.mjs        # → 無出力(非engineering)
+  | node .claude/hooks/engineering-core-hook/hook.mjs        # → 無出力(非engineering)
 ```
