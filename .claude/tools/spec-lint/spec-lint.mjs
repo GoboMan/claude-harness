@@ -321,6 +321,14 @@ function crossChecks(model) {
 		}
 	}
 
+	//  契約カバレッジ: spec が fixed（＝実装に進んでよい）なのに契約ファイルが
+	//  無い機能を可視化する。実装は契約 fixed を前提とするため、欠落を沈黙させない。
+	//  誤検知の余地（契約整備前の中間状態）があるため err でなく warn。
+	for (const [id, spec] of specs) {
+		if (spec.status === "fixed" && !contracts.has(id))
+			warn(spec.file, `${id}: spec が fixed だが契約ファイルが無い（docs/contracts に契約を作る）`);
+	}
+
 	//  contract ↔ spec（親 draft に fixed 契約は不可・親の存在・入出力の相互整合）
 	for (const [id, c] of contracts) {
 		const spec = specs.get(id);
@@ -396,7 +404,11 @@ function gateFeature(docsDir, id) {
 	}
 	if (s.spec !== "fixed")
 		err("gate", `${id}: spec が fixed でない（draft のまま実装しない）`);
-	if (s.contractFound && s.contract !== "fixed")
+	//  契約は「存在し、かつ fixed」を要求する。契約ファイルの欠落を
+	//  実装ゲートで素通りさせない（契約なしのまま実装が進む事故を断つ）。
+	if (!s.contractFound)
+		err("gate", `${id}: 契約が無い（docs/contracts に契約を作り fixed にする）`);
+	else if (s.contract !== "fixed")
 		err("gate", `${id}: 契約が fixed でない（draft のまま実装しない）`);
 }
 
