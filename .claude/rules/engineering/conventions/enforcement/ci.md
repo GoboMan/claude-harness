@@ -86,6 +86,31 @@ jobs:
         run: node .claude/tools/spec-lint/spec-lint.mjs validate
 ```
 
+### 再利用可能ワークフロー（gate の L2 裏取り・ロジックを harness に集約）
+
+commit-msg の `gate`（[hooks.md](./hooks.md)）は `--no-verify` で回避できるため、回避不能な L2 でも
+裏取りする。ワークフローの**ロジックは harness 側に集約**し（本 harness は PUBLIC なので別オーナーの
+private リポジトリからも呼べる）、各プロジェクトは薄いスタブから `uses:` で参照する。更新はタグ更新で伝播する。
+
+- harness 同梱: [`.github/workflows/spec-gate.yml`](../../../../../.github/workflows/spec-gate.yml)
+  （`workflow_call`。`validate` ＋ PR 各コミットの `gate` を走らせる）
+- プロジェクト側スタブ（`.github/workflows/spec-gate.yml`）:
+
+```yaml
+name: spec-gate
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  spec-gate:
+    uses: GoboMan/claude-harness/.github/workflows/spec-gate.yml@vX.Y.Z   # 使う tag に合わせる
+```
+
+> 検査ツールは呼び出し側の `.claude`（＝ harness の submodule）同梱の spec-lint を使う（バージョンは
+> submodule の pin で決まる）。組織ポリシーで「select actions のみ許可」の場合、外部再利用ワークフローの
+> 許可設定が要ることがある（塞がれるなら job を自リポジトリにインライン展開する）。
+
 ## L3 — ブランチ保護 / Ruleset
 
 CI をゲート化するには、GitHub 側で **必須ステータスチェック**に指定する必要がある（コードでは完結しない）。`gh` CLI があれば自動化できる。
