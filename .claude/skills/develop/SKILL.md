@@ -7,7 +7,7 @@ description: システム開発（新機能・実装・修正・設計）を、A
 
 > **このスキルを起動した時点で、あなた（メインエージェント）は orchestrator である。**
 > あなたは原則コードを書かない。**SSOT を正とし、専門サブエージェント（`.claude/agents/develop/`）を Task ツールで順に起動し、停止・報告を受けて分岐する指揮者**に徹する。
-> 各エージェントの人格は `.claude/agents/develop/*.md`。**本 SKILL は orchestrator の判断核（§0–§2・§6）と実行台本（§3–§5）を自己完結で内包する**（orchestrator だけが読むため、rules に置かずここへ一元化）。節番号は本書で一意。
+> 各エージェントの人格は `.claude/agents/develop/*.md`。**本 SKILL は orchestrator の判断核（§0–§2・§6–§7）と実行台本（§3–§5）を自己完結で内包する**（orchestrator だけが読むため、rules に置かずここへ一元化）。節番号は本書で一意。
 
 ## orchestrator の不変則
 
@@ -130,7 +130,7 @@ description: システム開発（新機能・実装・修正・設計）を、A
 
 ### Phase 1 — 基準SSOT定義（まとめて固める）
 - 全機能を列挙し、機能詳細と反証可能な GWT 受け入れ条件を書く。
-- **入力**: orchestrator が対象スコープ（何を作る/変えるか）を渡す（この時点で既存 SSOT は無く、agent はスコープから起こす）。
+- **入力**: orchestrator が対象スコープ（何を作る/変えるか）を渡す（新規は agent がスコープから起こす。更新時は既存 SSOT のパスも渡し、差分で更新させる）。
 - **起動**: `ssot-definer`（§5-A）
 - **完了条件**: 全機能が列挙され、各機能に反証可能な GWT が付与され、ハッピーパス以外の状態（error / loading / empty / 権限 / 境界）も受け入れ条件に含まれている。
 
@@ -224,14 +224,14 @@ Phase 3 で固定した処理インターフェース契約を土台に、fronte
 
 | 旧記号 | agent ファイル（`.claude/agents/develop/`） | 起動局面 | 入力（orchestrator が渡す） | アーキタイプ | 独立性 |
 |---|---|---|---|---|---|
-| A | `ssot-definer.md` | Phase1 冒頭（機能一覧・詳細） | 対象スコープ（何を作るか） | 🙋 人間ゲート | — |
+| A | `ssot-definer.md` | Phase1 冒頭（機能一覧・詳細） | 対象スコープ（何を作る/変えるか）＋既存 SSOT のパス（更新の場合） | 🙋 人間ゲート | — |
 | C | `skeleton-runner.md` | Gate で高リスク判定時のみ | 対象サブシステム＋最リスクのパス1本＋参照構造 | 🔬 探索（使い捨て） | — |
-| D1 | `db-designer.md` | Phase3（DB 設計） | 対象機能の SSOT（機能詳細） | 🙋 人間ゲート | 契約と別コンテキスト |
+| D1 | `db-designer.md` | Phase3（DB 設計） | 対象機能の SSOT（機能詳細）＋既存スキーマのパス（更新の場合） | 🙋 人間ゲート | 契約と別コンテキスト |
 | D2 | `contract-author.md` | Phase3（処理インターフェース契約） | 確定済み機能詳細＋確定済み DB | 🤖 機械オラクル | producer 間で別コンテキスト |
 | E | `structure-oracle.md` | D1–D2 完了後 | 判定対象（機能詳細・DB・契約） | 🔴 独立判定 | ビルダーと別コンテキスト必須 |
 | F | `test-designer.md` | Phase4 各スライスの実装前 | GWT＋契約 | 🤖 機械オラクル | 実装と別コンテキスト必須 |
-| G1 | `frontend-ui-implementer.md` | Phase4a-1（見た目 html/css/js） | 機能詳細＋契約 response＋UI表示テスト(Red) | 🤖 表示テスト＋人間の一瞥 | 他の実装と別コンテキスト |
-| G1b | `frontend-logic-implementer.md` | Phase4a-2（frontend 処理・純粋関数） | 契約＋実装済みの見た目＋frontend ロジックテスト(Red) | 🤖 機械ループ | 他の実装と別コンテキスト |
+| G1 | `frontend-ui-implementer.md` | Phase4a-1（見た目 html/css/js） | 機能詳細＋契約 response＋UI表示テスト(Red)＋framework 規約(あれば) | 🤖 表示テスト＋人間の一瞥 | 他の実装と別コンテキスト |
+| G1b | `frontend-logic-implementer.md` | Phase4a-2（frontend 処理・純粋関数） | 契約＋実装済みの見た目＋frontend ロジックテスト(Red)＋framework 規約(あれば) | 🤖 機械ループ | 他の実装と別コンテキスト |
 | G2 | `backend-logic-implementer.md` | Phase4b（backend 処理・純粋関数） | 契約＋機能詳細＋backend テスト(Red)＋framework 規約(あれば) | 🤖 機械ループ | 他の実装と別コンテキスト |
 | H | `slice-attacker.md` | Phase4 各スライス完了ごと | 対象スライス＋受け入れ条件＋契約＋本番相当環境 | 🔴 レッドチーム | 実装と別コンテキスト必須 |
 | I | `system-attacker.md` | Phase5 完成直前 | システム全体＋全体 SSOT＋本番相当環境 | 🔴 レッドチーム | 全ビルダーと別コンテキスト必須 |
@@ -260,7 +260,7 @@ B（skeleton 要否判定）と J（差し戻し判定）は、どの producer �
 | ドラフト＋確認論点（機能一覧・詳細） | ssot-definer | 🙋 人間に提示 → 承認で `fixed` 化・次フェーズへ／修正指示で producer 再起動 |
 | ドラフト＋確認論点（DB 設計） | db-designer | 🙋 人間に提示 → 承認で `fixed` 化／修正指示で再起動 |
 | 見た目＋確認依頼 | frontend-ui-implementer | 🙋 人間に見た目を提示 → 承認で確定／修正指示で再実装 |
-| 契約を確定できない（機能/UI/DB の欠陥が原因） | contract-author | 🙋 原因の人間オラクル（①〜③）へ差し戻し → 承認後に契約を再導出 |
+| 契約を確定できない（機能/DB の欠陥が原因） | contract-author | 🙋 原因の人間オラクル（①機能詳細 or ③DB）へ差し戻し → 承認後に契約を再導出 |
 | 契約の補足（承認済み SSOT＋DB から導出可能） | contract-author | 🤖 contract-author を再起動して補い、structure-oracle が再判定 |
 | 不整合リスト | structure-oracle | 🤖 該当 producer へ差し戻し → 再判定、空までループ（原因が①〜③なら🙋へ） |
 | GWT/契約の不足 | test-designer | 原因が SSOT → 🙋／契約 → 🤖 再導出 |
