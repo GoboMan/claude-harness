@@ -6,9 +6,9 @@ AI（特に Claude）の**ベースライン・コンテキストをゼロに保
 
 ## 🎯 思想：なぜ「全部盛り」をやめるのか
 
-多くのプロジェクトでは `CLAUDE.md` に規約・スタック・執筆ルールを全部書き込みます。しかしこれは以下の問題を生みます。
+多くのプロジェクトでは `CLAUDE.md` に規約・スタック・業務ルールを全部書き込みます。しかしこれは以下の問題を生みます。
 
-- **コンテキスト汚染**: フロントの作業中にブログ執筆ルールまで読まされ、判断がぶれる。
+- **コンテキスト汚染**: フロントの作業中に翻訳ルールまで読まされ、判断がぶれる。
 - **保守不能**: 1 ファイルが肥大化し、どこに何があるか誰も分からなくなる。
 - **トークンの浪費**: 使わないルールを毎回ロードする。
 
@@ -31,8 +31,7 @@ AI（特に Claude）の**ベースライン・コンテキストをゼロに保
 
 ```text
 ① paths ゲート … 各葉の frontmatter `paths:` にマッチするファイルを触ると、その葉だけ注入
-   例) blog/ や _posts/ を触る    → routines/writings/blog.md が載る
-       crow3_* 配下を触る          → web/crow/{overview,coding,testing}.md が載る
+   例) crow3_* 配下を触る          → web/crow/{overview,coding,testing}.md が載る
 
 ② skill エントリ … 手続きは skill として description 自動起動 or /name 明示起動
    例) 「開発したい」/develop → develop skill に orchestrator の核・実行台本が丸ごと載る
@@ -73,8 +72,7 @@ claude-harness/
       │    │              └── testing.md    #         テスト設計（PHPUnit）
       │    │
       │    └── routines/                    #   🎬 シーン: 日常業務
-      │         ├── translation/manga-ko-ja/ #    🌏 韓国語漫画→日本語（overview/register/consistency/*-format）
-      │         └── writings/blog.md        #     ✍️ ブログ執筆のルール
+      │         └── translation/manga-ko-ja/ #    🌏 韓国語漫画→日本語（overview/register/consistency/*-format）
       │
       ├── agents/                           # 🤖 サブエージェント（scene 別に集約）
       │    └── develop/                      #   開発（/develop の orchestrator が Task 起動）
@@ -93,7 +91,6 @@ claude-harness/
       ├── skills/                           # 🛠️ 共通スキル（description で自動起動 / /name で明示起動）
       │    │  ※ skill は必ず skills/<name>/SKILL.md の1階層に置く（Claude Code はこの階層しか探索しない）
       │    ├── develop/SKILL.md                    # 🎼 開発の指揮者（orchestrator）。核・台本を内包。入口 /develop
-      │    ├── writing/SKILL.md                    # 記事・ブログ執筆／推敲の入口
       │    ├── translate-manga-ko-ja/SKILL.md      # 韓国語漫画→日本語の翻訳チェックシート生成
       │    └── grilling/SKILL.md                   # 計画・設計を詰めるインタビュー
       │
