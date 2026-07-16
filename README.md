@@ -95,8 +95,7 @@ claude-harness/
       │    ├── develop/SKILL.md                    # 🎼 開発の指揮者（orchestrator）。核・台本を内包。入口 /develop
       │    ├── writing/SKILL.md                    # 記事・ブログ執筆／推敲の入口
       │    ├── translate-manga-ko-ja/SKILL.md      # 韓国語漫画→日本語の翻訳チェックシート生成
-      │    ├── grilling/SKILL.md                   # 計画・設計を詰めるインタビュー
-      │    └── git-guardrails-claude-code/SKILL.md # 危険な git 操作をブロック（スクリプト同梱）
+      │    └── grilling/SKILL.md                   # 計画・設計を詰めるインタビュー
       │
       └── tools/                            # 🔧 実行アセット（バリデータ）
            ├── spec-lint/                          # docs SSOT 検証（producer が直接叩く）
