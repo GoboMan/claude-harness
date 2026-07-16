@@ -9,7 +9,7 @@ paths:
 > 韓国語で描かれた漫画（ウェブトゥーン等）を日本語に翻訳し、**最終的に人間が必ずチェックする**前提で、
 > そのチェックコスト（脳の疲労・時間）を最小化するための型。ここは**この型の不変の核**（最初に読む）。
 > 各書式の詳細は同カタログの葉（[master-format](master-format.md) / [script-format](script-format.md) / [register](register.md) / [consistency](consistency.md)）へ。
-> 実行手続きは skill [translate-manga-ko-ja](../../../../skills/translate-manga-ko-ja/SKILL.md)。
+> 実行手続きは skill [translate-manga-ko-ja](../../skills/translate-manga-ko-ja/SKILL.md)。
 
 ## 前提思想（これが全体の土台）
 

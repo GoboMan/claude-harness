@@ -71,27 +71,29 @@ claude-harness/
       │    │              ├── coding.md     #         コーディング規約
       │    │              └── testing.md    #         テスト設計（PHPUnit）
       │    │
-      │    └── routines/                    #   🎬 シーン: 日常業務
-      │         └── translation/manga-ko-ja/ #    🌏 韓国語漫画→日本語（overview/register/consistency/*-format）
+      │    └── translate-manga-ko-ja/       #   🈯 翻訳の型（overview/register/consistency/master-format/script-format）
       │
-      ├── agents/                           # 🤖 サブエージェント（scene 別に集約）
-      │    └── develop/                      #   開発（/develop の orchestrator が Task 起動）
-      │         ├── ssot-definer.md                # Phase1 機能一覧・詳細（人間ゲート）
-      │         ├── db-designer.md, contract-author.md  # Phase3 構造（DB＝人間ゲート／契約＝機械）
-      │         ├── structure-oracle.md            # 構造整合の独立判定
-      │         ├── test-designer.md               # GWT＋契約から Red テスト（実装前）
-      │         ├── frontend-ui-implementer.md     # Phase4a-1 見た目（html/css/js）
-      │         ├── frontend-logic-implementer.md  # Phase4a-2 frontend 処理・純粋関数
-      │         ├── backend-logic-implementer.md   # Phase4b backend 処理・純粋関数
-      │         ├── slice-attacker.md, system-attacker.md # 攻撃（スライス／横断）
-      │         ├── skeleton-runner.md             # 高リスク時のみ E2E 貫通（使い捨て）
-      │         ├── committer.md                    # commit / PR の実行専任（git 規約を body に内包）
-      │         └── adr-writer.md                   # アーキテクチャ決定記録(ADR)を書く producer（書式を body に内包）
+      ├── agents/                           # 🤖 サブエージェント（key 別に集約）
+      │    ├── develop/                      #   開発（/develop の orchestrator が Task 起動）
+      │    │    ├── ssot-definer.md                # Phase1 機能一覧・詳細（人間ゲート）
+      │    │    ├── db-designer.md, contract-author.md  # Phase3 構造（DB＝人間ゲート／契約＝機械）
+      │    │    ├── structure-oracle.md            # 構造整合の独立判定
+      │    │    ├── test-designer.md               # GWT＋契約から Red テスト（実装前）
+      │    │    ├── frontend-ui-implementer.md     # Phase4a-1 見た目（html/css/js）
+      │    │    ├── frontend-logic-implementer.md  # Phase4a-2 frontend 処理・純粋関数
+      │    │    ├── backend-logic-implementer.md   # Phase4b backend 処理・純粋関数
+      │    │    ├── slice-attacker.md, system-attacker.md # 攻撃（スライス／横断）
+      │    │    ├── skeleton-runner.md             # 高リスク時のみ E2E 貫通（使い捨て）
+      │    │    ├── committer.md                    # commit / PR の実行専任（git 規約を body に内包）
+      │    │    └── adr-writer.md                   # アーキテクチャ決定記録(ADR)を書く producer（書式を body に内包）
+      │    └── translate-manga-ko-ja/        #   翻訳（/translate-manga-ko-ja の orchestrator が Task 起動）
+      │         ├── maker.md                       # 翻訳の1脳（Stage1–4：対訳シート＋master差分提案）
+      │         └── judge.md                       # 独立レビュー（Stage5：ブレ・口調矛盾・⚠漏れを反証）
       │
       ├── skills/                           # 🛠️ 共通スキル（description で自動起動 / /name で明示起動）
       │    │  ※ skill は必ず skills/<name>/SKILL.md の1階層に置く（Claude Code はこの階層しか探索しない）
       │    ├── develop/SKILL.md                    # 🎼 開発の指揮者（orchestrator）。核・台本を内包。入口 /develop
-      │    ├── translate-manga-ko-ja/SKILL.md      # 韓国語漫画→日本語の翻訳チェックシート生成
+      │    ├── translate-manga-ko-ja/SKILL.md      # 🈯 翻訳の指揮者（orchestrator）。maker/judge を起動。入口 /translate-manga-ko-ja
       │    └── grilling/SKILL.md                   # 計画・設計を詰めるインタビュー
       │
       └── tools/                            # 🔧 実行アセット（バリデータ）
@@ -101,6 +103,20 @@ claude-harness/
 
 > 💡 **harness が同梱する機械チェックは「検証ツール」だけ**（`tools/spec-lint`＝docs SSOT 検証、`tools/php-conventions`＝crow coding 検証）。producer がタスク中に直接叩く。
 > **フック / CI への配線・ブランチ保護といった「設置」は各プロジェクトの責務**（かつて `enforcer` エージェント＋`conventions/enforcement/` が担ったが、入口 skill の廃止に伴い撤去）。durable な知識は agent body / rules に畳み、実行アセットは `.claude/tools/` に置く。
+
+## 🧱 手続きの3木（skills / agents / rules を同じキーで揃える）
+
+orchestrator を伴う手続き（`develop`・`translate-manga-ko-ja` など）は、**同じキー名で3つの木に分かれて存在する**。人間も AI も、キーを1つ知れば「入口・実行者・型」が一目で辿れる。これが本リポジトリの手続きの標準形である。
+
+| 木 | 役割（何の SSOT か） | develop | translate-manga-ko-ja |
+| --- | --- | --- | --- |
+| `skills/<key>/SKILL.md` | 入口＝orchestrator の判断核・実行台本（**どう回すか**） | `skills/develop/` | `skills/translate-manga-ko-ja/` |
+| `agents/<key>/*.md` | orchestrator が Task 起動する専門サブエージェントの人格（**craft** の SSOT） | `agents/develop/`（ssot-definer・committer …） | `agents/translate-manga-ko-ja/`（maker・judge） |
+| `rules/<key>/**` | paths ゲートで遅延ロードされる型・規約の葉（**書式** の SSOT） | `rules/develop/web/crow/` | `rules/translate-manga-ko-ja/` |
+
+- **skill は複製しない。** 型は rules、craft は agent body が SSOT。skill は「どう回すか」だけを持ち、両者の中身をコピペしない。
+- **作る主体 ≠ 判定する主体。** どちらの手続きも producer（develop=implementer 群 / 翻訳=maker）と独立オラクル（develop=oracle/attacker 群 / 翻訳=judge）を**別 agent・別コンテキスト**に分ける。
+- **キー名は3木で一致させる。** 新しい手続きを足すときも、この3木を同名で生やす（skills/agents/rules すべて同じ `<key>`）。
 
 ## 🚀 使い方
 

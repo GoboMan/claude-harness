@@ -9,7 +9,7 @@ paths:
 > 作品共通のマスターデータ（**読み取りが正**）の書式を定める。
 > ep-001 は原本から起こし（ブートストラップ）、以降はこれを読み込んで訳す。
 > なぜ作品共通に切り出すか・更新の作法は [overview.md](overview.md) / [consistency.md](consistency.md)。
-> 実行手続きは skill [translate-manga-ko-ja](../../../../skills/translate-manga-ko-ja/SKILL.md) の Stage 1。
+> 実行手続きは skill [translate-manga-ko-ja](../../skills/translate-manga-ko-ja/SKILL.md) の Stage 1。
 
 ## 1. 作品理解ノート（story.md）
 

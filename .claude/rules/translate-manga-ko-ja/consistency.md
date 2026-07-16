@@ -9,7 +9,7 @@ paths:
 > master を黙って書き換えない作法（差分提案）と、連載を通じた一貫性の担保を定める。
 > 単発の正しさより「前の話数と同じか」を保証することが、長期連載での価値。
 > master の書式は [master-format.md](master-format.md)、なぜこの型かは [overview.md](overview.md)。
-> 実行手続きは skill [translate-manga-ko-ja](../../../../skills/translate-manga-ko-ja/SKILL.md) の Stage 4・5。
+> 実行手続きは skill [translate-manga-ko-ja](../../skills/translate-manga-ko-ja/SKILL.md) の Stage 4・5。
 
 ## 🔁 増分更新（マスターを黙って書き換えない）
 

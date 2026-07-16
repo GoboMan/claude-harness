@@ -9,7 +9,7 @@ paths:
 > 人間チェックの主戦場となる対訳シートの必須フォーマットを定める。
 > **訳文とその根拠を隣り合わせ**に並べ、人間の視点移動を最小にする。列は固定。
 > なぜこの型か（全行を等しく読ませない）は [overview.md](overview.md)。訳文の起こし方は [register.md](register.md)。
-> 実行手続きは skill [translate-manga-ko-ja](../../../../skills/translate-manga-ko-ja/SKILL.md) の Stage 3。
+> 実行手続きは skill [translate-manga-ko-ja](../../skills/translate-manga-ko-ja/SKILL.md) の Stage 3。
 
 ## 列（固定）
 
