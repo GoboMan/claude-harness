@@ -230,13 +230,13 @@ Phase 3 で固定した処理インターフェース契約を土台に、fronte
 |---|---|---|---|---|---|
 | A | `ssot-definer.md` | Phase1 冒頭（機能一覧・詳細） | 対象スコープ（何を作る/変えるか）＋既存 SSOT のパス（更新の場合） | 🙋 人間ゲート | — |
 | C | `skeleton-runner.md` | Gate で高リスク判定時のみ | 対象サブシステム＋最リスクのパス1本＋参照構造 | 🔬 探索（使い捨て） | — |
-| D1 | `db-designer.md` | Phase3（DB 設計） | 対象機能の SSOT（機能詳細）＋既存スキーマのパス（更新の場合）＋framework の DB 規約・書式(あれば) | 🙋 人間ゲート | 契約と別コンテキスト |
+| D1 | `db-designer.md` | Phase3（DB 設計） | 対象機能の SSOT（機能詳細）＋既存スキーマのパス（更新の場合）＋framework の DB 規約・書式のパス(あれば) | 🙋 人間ゲート | 契約と別コンテキスト |
 | D2 | `contract-author.md` | Phase3（処理インターフェース契約） | 確定済み機能詳細＋確定済み DB | 🤖 機械オラクル | producer 間で別コンテキスト |
 | E | `structure-oracle.md` | D1–D2 完了後 | 判定対象（機能詳細・DB・契約） | 🔴 独立判定 | ビルダーと別コンテキスト必須 |
-| F | `test-designer.md` | Phase4 各スライスの実装前 | GWT＋契約＋framework テスト規約(あれば) | 🤖 機械オラクル | 実装と別コンテキスト必須 |
-| G1 | `frontend-ui-implementer.md` | Phase4a-1（見た目 html/css/js） | 機能詳細＋契約 response＋UI表示テスト(Red)＋framework 規約(あれば) | 🤖 表示テスト＋人間の一瞥 | 他の実装と別コンテキスト |
-| G1b | `frontend-logic-implementer.md` | Phase4a-2（frontend 処理・純粋関数） | 契約＋実装済みの見た目＋frontend ロジックテスト(Red)＋framework 規約(あれば) | 🤖 機械ループ | 他の実装と別コンテキスト |
-| G2 | `backend-logic-implementer.md` | Phase4b（backend 処理・純粋関数） | 契約＋機能詳細＋backend テスト(Red)＋framework 規約(あれば) | 🤖 機械ループ | 他の実装と別コンテキスト |
+| F | `test-designer.md` | Phase4 各スライスの実装前 | GWT＋契約＋framework テスト規約パス(あれば) | 🤖 機械オラクル | 実装と別コンテキスト必須 |
+| G1 | `frontend-ui-implementer.md` | Phase4a-1（見た目 html/css/js） | 機能詳細＋契約 response＋UI表示テスト(Red)＋framework 規約パス(あれば) | 🤖 表示テスト＋人間の一瞥 | 他の実装と別コンテキスト |
+| G1b | `frontend-logic-implementer.md` | Phase4a-2（frontend 処理・純粋関数） | 契約＋実装済みの見た目＋frontend ロジックテスト(Red)＋framework 規約パス(あれば) | 🤖 機械ループ | 他の実装と別コンテキスト |
+| G2 | `backend-logic-implementer.md` | Phase4b（backend 処理・純粋関数） | 契約＋機能詳細＋backend テスト(Red)＋framework 規約パス(あれば) | 🤖 機械ループ | 他の実装と別コンテキスト |
 | H | `slice-attacker.md` | Phase4 各スライス完了ごと | 対象スライス＋受け入れ条件＋契約＋本番相当環境 | 🔴 レッドチーム | 実装と別コンテキスト必須 |
 | I | `system-attacker.md` | Phase5 完成直前 | システム全体＋全体 SSOT＋本番相当環境 | 🔴 レッドチーム | 全ビルダーと別コンテキスト必須 |
 | — | `committer.md` | スライス緑＋攻撃通過後（commit／指示あれば PR） | 意図（何を・なぜ・関連 ID）＋差分範囲＋PR 要否 | 🛠 副作用実行 | orchestrator と別コンテキスト |
@@ -282,7 +282,11 @@ B（skeleton 要否判定）と J（差し戻し判定）は、どの producer �
 
 ## 6. プラットフォーム / framework 固有規約（orchestrator が解決して渡す）
 
-producer（実装・DB 設計・テスト設計）を起動する前に、対象の platform/framework を判定し、該当する**規約葉のパスを解決して各 producer の入力に渡す**（agent 自身にカタログを辿らせない）。これらの葉は非常駐（`paths:` gate）なので、必要時に Read で開いて渡す。**規約は成果物ごとに宛先が違う**ので、下表の「渡す先」に沿って配る。
+producer（実装・DB 設計・テスト設計）を起動する前に、対象の platform/framework を判定し、該当する**規約葉のパスを解決して各 producer の入力に渡す**（agent 自身にカタログを辿らせない）。**配送は「パス渡し」に一本化する** — orchestrator が解決済みの1本のパスを Task 入力に載せ、producer 側が着手前にそれを Read する。葉を唯一の SSOT に保ち、中身をコピペして drift させない。渡されたパスの Read はカタログ探索ではないので許可される。
+
+> **なぜインライン展開でなくパス渡しか。** これらの葉は非常駐（`paths:` gate）で、native の paths ゲートは sub-agent の自コンテキストでも発火する（＝マッチするソースを Read した瞬間に注入される）が、それは**遅延**（読んだ後）で**宛先も glob 任せ**。greenfield の test-designer は「書く→後で発火」で手遅れになり、testing 規約が test-designer に届く保証もない。だから明示ハンドオフ（パス渡し）を**正**とし、native paths ゲートはその上に乗る**無償の安全網**とする（渡し忘れても実装体がソースを触れば救われる）。インライン展開（本文を prompt に貼る）は prompt を肥大させ SSOT を割りうるので、worktree isolation 等でパスが揺れる特殊時の代替に留める。
+
+**規約は成果物ごとに宛先が違う**ので、下表の「渡す先」に沿って配る。
 
 | platform / framework | 参照する箱 / 葉 | 渡す先 |
 |---|---|---|

@@ -13,7 +13,7 @@ model: sonnet
 
 - **GWT 受け入れ条件**: `docs/spec/<feature>.md`。
 - **処理インターフェース契約**: `docs/contracts/<feature>.md`。
-- **framework 固有のテスト規約**（あれば渡される。例: crow の testing.md＝PHPUnit の命名・assertion・データプロバイダ等）。渡されたら**その記法に従って Red テストコードを書く**。無ければテストランナーの一般的な作法に従う。
+- **framework 固有のテスト規約**（あれば**パスで渡される**。例: crow の testing.md＝PHPUnit の命名・assertion・データプロバイダ等）。パスが渡されたら**着手前にその1本を Read し**、**その記法に従って Red テストコードを書く**。無ければテストランナーの一般的な作法に従う（自分でカタログを探すな・捏造しない）。
 
 ## クラフト（あなたの専門技能）
 
