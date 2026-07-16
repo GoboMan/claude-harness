@@ -2,11 +2,10 @@
 //
 //  spec-lint — docs SSOT のフォーマット / ライフサイクル検証（harness 同梱ツール）
 //
-//  検証仕様の SSOT:
-//    conventions/docs/feature-list.md   (docs/spec/features.md)
-//    conventions/docs/feature-spec.md   (docs/spec/<feature>.md)
-//    conventions/docs/contract.md       (docs/contracts/<feature>.md)
-//  強制の位置づけ: conventions/enforcement/spec-lint.md
+//  検証対象の書式は producer サブエージェントの craft（agent body）が定める:
+//    agents/develop/ssot-definer.md   §A/§B  (docs/spec/features.md, docs/spec/<feature>.md)
+//    agents/develop/contract-author.md 書式リファレンス (docs/contracts/<feature>.md)
+//  その書式をコードに落とした実行仕様が本ファイル。
 //
 //  使い方:
 //    node spec-lint.mjs validate [--docs docs]      全 docs を検証（フォーマット＋不変条件）
@@ -207,7 +206,7 @@ function validateFeatureSpec(file, text) {
 	if (status === "fixed" && states) {
 		for (const kw of ["error", "empty", "権限"]) {
 			if (!statesText.includes(kw))
-				warn(file, `状態に "${kw}" 系の記述が見当たらない（feature-spec.md 参照）`);
+				warn(file, `状態に "${kw}" 系の記述が見当たらない（機能詳細の書式＝ssot-definer §B 参照）`);
 		}
 	}
 	const inputSec = findSection(body, (t) => t.startsWith("入力"));
@@ -286,7 +285,7 @@ function loadModel(docsDir) {
 		features = parseFeaturesTable(body);
 		if (features.length === 0) warn(featuresFile, "機能一覧テーブルに行が無い");
 	} else {
-		warn(featuresFile, "機能一覧 features.md が無い（feature-list.md 参照）");
+		warn(featuresFile, "機能一覧 features.md が無い（機能一覧の書式＝ssot-definer §A 参照）");
 	}
 
 	return { specs, contracts, features, specDir, featuresFile };

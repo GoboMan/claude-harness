@@ -6,7 +6,7 @@ description: 韓国語で描かれた漫画（ウェブトゥーン等）を日�
 # 🈯 translate-manga-ko-ja — 韓国語漫画の翻訳チェックシート生成
 
 > 韓国語漫画を日本語に訳し、**人間が必ず行う最終チェックのコストを最小化する**ためのパイプライン。
-> 型（なぜ・何を・書式）の SSOT は rules の [manga-ko-ja/](../../rules/routines/translation/manga-ko-ja/index.md)（サブカタログ）。本 skill は**どう実行するか**を担う。
+> 型（なぜ・何を・書式）の SSOT は rules の [manga-ko-ja/overview.md](../../rules/routines/translation/manga-ko-ja/overview.md)（★最初に読む思想）と各書式葉（master-format / script-format / register / consistency）。本 skill は**どう実行するか**を担う。
 > フォルダ構成・対訳シートの厳格フォーマット・信頼度コードは、すべて上記 rules を正とする。各 Stage で開く葉は下記にリンクする。
 
 ## 🔒 純粋関数的な契約（同じ入力 → 同じ出力構造）

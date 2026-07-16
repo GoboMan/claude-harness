@@ -8,7 +8,9 @@
 #
 # install が行うこと:
 #   1. 対象プロジェクトに .claude/（rules・skills）を配置する
-#   2. CLAUDE.template.md を CLAUDE.md としてルートに設置する（既存があれば温存）
+#      （routing はネイティブの .claude/rules 自動ロード＋skill で行うため、
+#       ルーター用の CLAUDE.md は設置しない。プロジェクト固有の事実が要るなら
+#       各プロジェクトが自分で CLAUDE.md を用意する）
 #
 # 配置方式（--mode）:
 #   submodule  (既定) harness を対象リポジトリの submodule として取り込み、
@@ -29,8 +31,7 @@
 # update が行うこと（submodule 配置の SSOT を取り込む）:
 #   対象の .claude-harness を最新（または --tag 指定）のリリースへ固定し、その版を
 #   コミットでピン留めする。対象を省略するとカレントの git リポジトリを対象にする。
-#   --no-commit は更新のみでコミットしない。ルーター（CLAUDE.template.md）に変更が
-#   あれば警告する（CLAUDE.md 自体は温存のため触らない）。
+#   --no-commit は更新のみでコミットしない。
 #   ※ symlink は harness 側で git pull するだけ、copy は install --force で更新する。
 
 set -euo pipefail
@@ -62,8 +63,7 @@ usage:
   --no-commit   更新のみ行いコミットしない。update のみ。
   -h, --help    このヘルプを表示。
 
-注: CLAUDE.md は既存があれば常に温存する（--force でも上書きしない）。
-    update は submodule 配置に対してのみ有効。
+注: update は submodule 配置に対してのみ有効。
     harness にはリリースタグ（例: v0.1.0）が必要。
 EOF
 }
@@ -151,14 +151,6 @@ do_update()
     exit 0
   fi
 
-  # ルーター（CLAUDE.template.md）が変わっていれば警告（CLAUDE.md は温存のため触らない）
-  if git -C "${sub}" diff --quiet "${old_sha}" "${new_sha}" -- CLAUDE.template.md; then
-    :
-  else
-    warn "CLAUDE.template.md changed in ${tag}; review ${TARGET_DIR}/CLAUDE.md against it"
-    warn "  (update does not touch CLAUDE.md; router changes must be merged by hand)"
-  fi
-
   checkout_tag "${sub}" "${tag}"
   git -C "${TARGET_DIR}" add "${SUBMODULE_PATH}"
 
@@ -186,8 +178,7 @@ do_install()
     *) die "invalid --mode: ${MODE} (submodule|symlink|copy)" ;;
   esac
 
-  [[ -d "${SRC_DIR}/.claude" ]]            || die "source .claude not found: ${SRC_DIR}/.claude"
-  [[ -f "${SRC_DIR}/CLAUDE.template.md" ]] || die "source CLAUDE.template.md not found"
+  [[ -d "${SRC_DIR}/.claude" ]] || die "source .claude not found: ${SRC_DIR}/.claude"
 
   if [[ "${TARGET_DIR}" == "${SRC_DIR}" ]]; then
     die "target is the harness repository itself; choose a different project"
@@ -209,7 +200,7 @@ do_install()
     fi
   fi
 
-  # --- 1. .claude/ の配置 ---
+  # --- .claude/ の配置 ---
   case "${MODE}" in
     symlink)
       ln -s "${SRC_DIR}/.claude" "${dest_claude}"
@@ -261,21 +252,9 @@ do_install()
       ;;
   esac
 
-  # --- 2. CLAUDE.md の設置（既存は温存） ---
-  local dest_claude_md="${TARGET_DIR}/CLAUDE.md"
-  if [[ -e "${dest_claude_md}" ]]; then
-    warn "CLAUDE.md already exists at target; leaving it untouched"
-    warn "  compare with template if needed: ${SRC_DIR}/CLAUDE.template.md"
-  else
-    cp "${SRC_DIR}/CLAUDE.template.md" "${dest_claude_md}"
-    log "installed CLAUDE.md from template"
-  fi
-
   log "done."
-  log "next: open the project and let the AI route via CLAUDE.md."
-  log "      then trigger the 'bootstrap-project' skill to reach an implementable,"
-  log "      rules-compliant state (new or existing project; wires enforcement and"
-  log "      delegates code reverse-generation to 'retrofit-to-rules')."
+  log "next: open the project; the AI routes via skills (/develop など). rules load on-demand (常駐なし)."
+  log "      start development with the 'develop' skill (/develop)."
   if [[ "${MODE}" == "submodule" ]]; then
     log "      commit the placement, then pull updates later with: ./init.sh update ${TARGET_DIR}"
   fi
