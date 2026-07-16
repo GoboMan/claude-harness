@@ -3,8 +3,9 @@
 # init.sh — claude-harness を対象プロジェクトへ導入 / 更新する
 #
 # 使い方:
-#   導入:  ./init.sh [install] /path/to/your-project [--mode submodule|symlink|copy] [--tag vX.Y.Z] [--force]
+#   導入:  ./init.sh [install] /path/to/your-project [--mode submodule|symlink|copy] [--tag vX.Y.Z] [--force] [--cursor]
 #   更新:  ./init.sh update [/path/to/your-project] [--tag vX.Y.Z] [--no-commit]
+#   Cursor: ./init.sh cursor [/path/to/your-project]   # .claude/rules → .cursor/rules を再生成
 #
 # install が行うこと:
 #   1. 対象プロジェクトに .claude/（rules・skills）を配置する
@@ -33,6 +34,12 @@
 #   コミットでピン留めする。対象を省略するとカレントの git リポジトリを対象にする。
 #   --no-commit は更新のみでコミットしない。
 #   ※ symlink は harness 側で git pull するだけ、copy は install --force で更新する。
+#
+# cursor が行うこと（Cursor 併用者向けの射影）:
+#   対象の .claude/rules を Cursor の Auto Attached ルール（.cursor/rules/**/*.mdc）へ
+#   機械変換する。paths ゲート → globs ゲートの純粋な射影で、.claude が SSOT のまま。
+#   install に --cursor を付けると配置直後に自動生成する。update 後は本アクションで再生成する。
+#   ※ skill/agent（subagent 起動）は Cursor に相当機構が無いため射影しない。
 
 set -euo pipefail
 
@@ -43,6 +50,7 @@ ACTION="install"
 MODE="submodule"
 FORCE="false"
 NO_COMMIT="false"
+CURSOR="false"
 TARGET_DIR=""
 TAG=""
 
@@ -54,17 +62,20 @@ usage()
 {
   cat >&2 <<'EOF'
 usage:
-  install: ./init.sh [install] /path/to/your-project [--mode submodule|symlink|copy] [--tag vX.Y.Z] [--force]
+  install: ./init.sh [install] /path/to/your-project [--mode submodule|symlink|copy] [--tag vX.Y.Z] [--force] [--cursor]
   update:  ./init.sh update [/path/to/your-project] [--tag vX.Y.Z] [--no-commit]
+  cursor:  ./init.sh cursor [/path/to/your-project]
 
   --mode <m>    配置方式（既定: submodule）。submodule / symlink / copy。install のみ。
   --tag <t>     固定するリリースタグ（既定: 最新の v* タグ）。submodule 配置のみ。
   --force       対象の既存 .claude/ を置き換える（既定は中断）。install のみ。
+  --cursor      配置後に .cursor/rules（Cursor 用 Auto Attached ルール）も生成。install のみ。
   --no-commit   更新のみ行いコミットしない。update のみ。
   -h, --help    このヘルプを表示。
 
 注: update は submodule 配置に対してのみ有効。
     harness にはリリースタグ（例: v0.1.0）が必要。
+    cursor は対象の .claude/rules を .cursor/rules へ射影する（対象省略時はカレント repo）。
 EOF
 }
 
@@ -84,7 +95,7 @@ checkout_tag()
 # --- アクション判定（先頭の位置引数が install/update ならそれを採用） ---
 if [[ $# -gt 0 ]]; then
   case "$1" in
-    install|update) ACTION="$1"; shift ;;
+    install|update|cursor) ACTION="$1"; shift ;;
   esac
 fi
 
@@ -96,6 +107,7 @@ while [[ $# -gt 0 ]]; do
     --tag)       TAG="${2:-}"; shift 2 ;;
     --tag=*)     TAG="${1#*=}"; shift ;;
     --force)     FORCE="true"; shift ;;
+    --cursor)    CURSOR="true"; shift ;;
     --no-commit) NO_COMMIT="true"; shift ;;
     -h|--help)   usage; exit 0 ;;
     --) shift; break ;;
@@ -162,6 +174,28 @@ do_update()
   git -C "${TARGET_DIR}" commit -m "chore: set claude-harness to ${tag}"
   log "committed: claude-harness -> ${tag}."
   exit 0
+}
+
+# =============================== cursor ===============================
+# 対象の .claude/rules を Cursor 用 .cursor/rules へ射影する（純粋な生成）。
+do_cursor()
+{
+  if [[ -z "${TARGET_DIR}" ]]; then
+    TARGET_DIR="$(git rev-parse --show-toplevel 2>/dev/null || echo "${PWD}")"
+  fi
+  [[ -d "${TARGET_DIR}" ]] || die "target directory not found: ${TARGET_DIR}"
+  TARGET_DIR="$(cd "${TARGET_DIR}" && pwd)"
+
+  local claude="${TARGET_DIR}/.claude"
+  [[ -d "${claude}" ]] \
+    || die "no .claude at target; install the harness first: ${claude}"
+
+  local gen="${SRC_DIR}/.claude/tools/cursor-sync/sync.sh"
+  [[ -x "${gen}" ]] || gen="bash ${SRC_DIR}/.claude/tools/cursor-sync/sync.sh"
+
+  ${gen} "${claude}" "${TARGET_DIR}/.cursor"
+  log "cursor projection written: ${TARGET_DIR}/.cursor (rules/skills/agents)"
+  log "note: rules=globs ゲート, skills=/name 入口, agents=独立コンテキスト subagent。"
 }
 
 # =============================== install ==============================
@@ -252,6 +286,11 @@ do_install()
       ;;
   esac
 
+  # --cursor 指定時は配置直後に .cursor/rules も生成する
+  if [[ "${CURSOR}" == "true" ]]; then
+    do_cursor
+  fi
+
   log "done."
   log "next: open the project; the AI routes via skills (/develop など). rules load on-demand (常駐なし)."
   log "      start development with the 'develop' skill (/develop)."
@@ -263,4 +302,5 @@ do_install()
 case "${ACTION}" in
   update)  do_update ;;
   install) do_install ;;
+  cursor)  do_cursor ;;
 esac
