@@ -31,7 +31,7 @@ AI（特に Claude）の**ベースライン・コンテキストをゼロに保
 
 ```text
 ① paths ゲート … 各葉の frontmatter `paths:` にマッチするファイルを触ると、その葉だけ注入
-   例) crow3_* 配下を触る          → web/crow/{overview,coding,testing}.md が載る
+   例) crow3_* 配下を触る          → web/crow/{overview,coding,testing,db}.md が載る
 
 ② skill エントリ … 手続きは skill として description 自動起動 or /name 明示起動
    例) 「開発したい」/develop → develop skill に orchestrator の核・実行台本が丸ごと載る
@@ -69,7 +69,8 @@ claude-harness/
       │    │         └── crow/              #       📦 framework: crow（PHP独自FW）
       │    │              ├── overview.md   #         入口・全体像
       │    │              ├── coding.md     #         コーディング規約
-      │    │              └── testing.md    #         テスト設計（PHPUnit）
+      │    │              ├── testing.md    #         テスト設計（PHPUnit）
+      │    │              └── db.md         #         DB 設計の書式・住所（db_design.txt）
       │    │
       │    └── translate-manga-ko-ja/       #   🈯 翻訳の型（overview/register/consistency/master-format/script-format）
       │
@@ -97,11 +98,10 @@ claude-harness/
       │    └── grilling/SKILL.md                   # 計画・設計を詰めるインタビュー
       │
       └── tools/                            # 🔧 実行アセット（バリデータ）
-           ├── spec-lint/                          # docs SSOT 検証（producer が直接叩く）
-           └── php-conventions/                    # crow coding.md の `!`・引数 `_` 検査
+           └── spec-lint/                          # docs SSOT 検証（producer が直接叩く）
 ```
 
-> 💡 **harness が同梱する機械チェックは「検証ツール」だけ**（`tools/spec-lint`＝docs SSOT 検証、`tools/php-conventions`＝crow coding 検証）。producer がタスク中に直接叩く。
+> 💡 **harness が同梱する機械チェックは「検証ツール」だけ**（`tools/spec-lint`＝docs SSOT 検証）。producer がタスク中に直接叩く。
 > **フック / CI への配線・ブランチ保護といった「設置」は各プロジェクトの責務**（かつて `enforcer` エージェント＋`conventions/enforcement/` が担ったが、入口 skill の廃止に伴い撤去）。durable な知識は agent body / rules に畳み、実行アセットは `.claude/tools/` に置く。
 
 ## 🧱 手続きの3木（skills / agents / rules を同じキーで揃える）

@@ -95,6 +95,7 @@ description: システム開発（新機能・実装・修正・設計）を、A
 - **①（まとめて固める）** は定義フェーズ。機能一覧・機能詳細は全機能を先に出し切る。これは他の全作業単位のスコープを決める土台なので、常に先行させる。「まとめて」＝全部を列挙する意味であり、「凍結」ではない。後続が欠陥を暴けば更新される。
 - **②（スライス実装）** は縦切りが基本。ただしリスクの高い構造だけは、本格実装の前に skeleton で1本 E2E 貫通させて妥当性を先に暴く（要否判定は §3）。
 - **frontend と backend は「スライス内の2トラック」に分ける。** 先に固定した契約を共有しつつ、両者を別コンテキストで並行させ、AIが一度に考える対象を二分する。さらに frontend トラックは「見た目（html/css/js・モック応答）→ 配線（リクエスト処理・純粋関数）」に分け、見た目だけを先に作れるようにする（オラクルが違う: 見た目は人間の一瞥、配線は機械テスト）。ただし分けるのはスライスの内側だけであり、「全機能の見た目を作ってから全機能の処理を作る」横積みにはしない（縦切りスライスの原則＝常にE2Eで1本通る、を維持する）。
+- **用語**: 本書の「frontend 処理／backend 処理」は、各実装 agent 名の「ロジック」（`frontend-logic-implementer` / `backend-logic-implementer`）と**同義**——リクエスト処理・状態・入力検証・純粋関数を指す。「見た目」（マークアップ・スタイル）とは別物。
 
 ---
 
@@ -123,10 +124,12 @@ description: システム開発（新機能・実装・修正・設計）を、A
 | 機能一覧 | `docs/spec/features.md` | `ssot-definer` |
 | 機能詳細 ＋ GWT（基準SSOT） | `docs/spec/<feature>.md` | `ssot-definer` |
 | 処理インターフェース契約 | `docs/contracts/<feature>.md` | `contract-author` |
+| DB 設計 | **framework/project が定める住所・書式**（§6 の規約が指定。規約が無ければ `docs/db/schema.md` にドラフト） | `db-designer` ＋ framework 規約 |
 | アーキテクチャ決定記録（ADR） | `docs/adr/NNNN-YYYY-MM-DD-title.md` | `adr-writer` |
 
 - 固定するのは全プロジェクト共通の最小骨格だけ。案件固有の docs は各プロジェクトの `docs/` に自由に足してよい。
-- **SSOT は実装に先行する。** 実装が仕様の欠陥を暴いたら、コードでなく `docs/spec/` を更新する。1 ファイル 1 関心事、参照は相対パス。
+- **DB 設計の住所・書式は develop 側で固定しない。** framework/project がマイグレーション元となるネイティブ形式を持つなら（例: crow の `db_design.txt`＝そこから直接マイグレーション生成）、**その1ファイルを唯一の SSOT** とし、`schema.md` 等へ写し替えて二重管理しない（SSOT を割らない）。ネイティブ形式が無い時だけ中立ドラフトを `docs/db/` に置く。住所・書式は §6 の framework 規約が供給し、`db-designer` に渡す。
+- **SSOT は実装に先行する。** 実装が仕様の欠陥を暴いたら、コードでなく SSOT（`docs/spec/` ／ DB 設計元ファイル）を更新する。1 ファイル 1 関心事、参照は相対パス。
 
 ### Phase 1 — 基準SSOT定義（まとめて固める）
 - 全機能を列挙し、機能詳細と反証可能な GWT 受け入れ条件を書く。
@@ -158,8 +161,8 @@ Phase 3 で固定した処理インターフェース契約を土台に、fronte
   - **4a-1 見た目**: 契約の response 形に沿って html/css/js を作る。データは契約通りにモック。**ロジックは書かない。** **起動**: `frontend-ui-implementer`（§5-G1）。ここだけ単独起動すれば「見た目だけ先に確認」ができる。
   - **4a-2 frontend 処理**: 契約の request/response に沿って、リクエスト処理・状態・純粋関数を Red → Green → Refactor で作り、見た目に配線する。**起動**: `frontend-logic-implementer`（§5-G1b）。
 - **Phase 4b — backend トラック**: 契約の request/response に沿って、バックエンド処理・純粋関数を Red → Green → Refactor で作る。**起動**: `backend-logic-implementer`（§5-G2）。frontend トラックと並行。
-- **結合**: frontend（4a-2 まで）と backend を契約で突き合わせて結合する。両者が契約を守っていれば食い違わない。
-- **起動順**: `test-designer`（§5-F, 独立。契約とGWTから UI表示／frontend処理／backend処理の3テストを起こす）→ 4a-1 → 4a-2 と 4b を並行 → 契約で結合 → スライス完了ごとに `slice-attacker`（§5-H）。
+- **結合（by-design：専任工程を置かない）**: frontend-logic が実装する API クライアントは**契約準拠の実物**であり、`モック` は frontend ロジックテスト専用にすぎない。したがって組み上がったスライスは、実行時に自動で実 backend を叩く——**mock→実 backend へ差し替える別工程・別 producer は不要**。両者が契約を守っていれば食い違わず、**結合が壊れていれば `slice-attacker` の本番相当 E2E（実 I/O・実結合）で露見する**（肯定的な "結合 OK" 判定を置くのではなく、実結合を攻撃して壊れなければ通過。テスト内モックのまま本番が動くわけではない）。
+- **起動順**: `test-designer`（§5-F, 独立。契約とGWTから UI表示／frontend処理／backend処理の3テストを起こす）→ **4a-1 と 4b を並行で開始**（backend は見た目に依存しないので待たない）→ 4a-1 完了後に 4a-2（見た目へ配線）→ 契約で結合（上記のとおり自動）→ スライス完了ごとに `slice-attacker`（§5-H）。
 - **重要**: テストは GWT と契約から起こす。実装を見て書かせない。テスト設計・見た目・frontend処理・backend処理はすべて別コンテキストにし、誤りが重ならないようにする。契約を変えたくなったら実装を止め、Phase 3 へ差し戻す（下記 差し戻しルール）。
 - **完了条件**: 見た目・frontend処理・backend処理とも契約に適合し、結合後に各機能を機能詳細と照合して整合。スライスを壊しにいっても壊れない。
 
@@ -194,8 +197,9 @@ Phase 3 で固定した処理インターフェース契約を土台に、fronte
 | 高リスク時のみ | `skeleton-runner` | — |
 | Phase3 構造 | `db-designer` → `contract-author` → `structure-oracle` | 🙋 **DB 設計を人間承認** |
 | Phase4 実装前 | `test-designer`（Red を起こす） | — |
-| Phase4a-1 見た目 | `frontend-ui-implementer` | 🙋 **見た目を人間承認** |
-| Phase4a-2 ∥ 4b | `frontend-logic-implementer` ∥ `backend-logic-implementer`（並行） | — |
+| Phase4a-1 見た目（∥ 4b 開始） | `frontend-ui-implementer`（同時に 4b backend を並行開始） | 🙋 **見た目を人間承認** |
+| Phase4a-2 frontend ロジック | `frontend-logic-implementer`（見た目へ配線） | — |
+| Phase4b backend | `backend-logic-implementer`（4a-1 と並行） | — |
 | スライス完了ごと | `slice-attacker` | — |
 | スライス緑＋攻撃通過後の commit／PR | `committer`（あなたは意図だけ渡す） | — |
 | 設計決定を記録するとき（任意・特に Phase3） | `adr-writer`（決定コンテキストを渡す） | — |
@@ -226,10 +230,10 @@ Phase 3 で固定した処理インターフェース契約を土台に、fronte
 |---|---|---|---|---|---|
 | A | `ssot-definer.md` | Phase1 冒頭（機能一覧・詳細） | 対象スコープ（何を作る/変えるか）＋既存 SSOT のパス（更新の場合） | 🙋 人間ゲート | — |
 | C | `skeleton-runner.md` | Gate で高リスク判定時のみ | 対象サブシステム＋最リスクのパス1本＋参照構造 | 🔬 探索（使い捨て） | — |
-| D1 | `db-designer.md` | Phase3（DB 設計） | 対象機能の SSOT（機能詳細）＋既存スキーマのパス（更新の場合） | 🙋 人間ゲート | 契約と別コンテキスト |
+| D1 | `db-designer.md` | Phase3（DB 設計） | 対象機能の SSOT（機能詳細）＋既存スキーマのパス（更新の場合）＋framework の DB 規約・書式(あれば) | 🙋 人間ゲート | 契約と別コンテキスト |
 | D2 | `contract-author.md` | Phase3（処理インターフェース契約） | 確定済み機能詳細＋確定済み DB | 🤖 機械オラクル | producer 間で別コンテキスト |
 | E | `structure-oracle.md` | D1–D2 完了後 | 判定対象（機能詳細・DB・契約） | 🔴 独立判定 | ビルダーと別コンテキスト必須 |
-| F | `test-designer.md` | Phase4 各スライスの実装前 | GWT＋契約 | 🤖 機械オラクル | 実装と別コンテキスト必須 |
+| F | `test-designer.md` | Phase4 各スライスの実装前 | GWT＋契約＋framework テスト規約(あれば) | 🤖 機械オラクル | 実装と別コンテキスト必須 |
 | G1 | `frontend-ui-implementer.md` | Phase4a-1（見た目 html/css/js） | 機能詳細＋契約 response＋UI表示テスト(Red)＋framework 規約(あれば) | 🤖 表示テスト＋人間の一瞥 | 他の実装と別コンテキスト |
 | G1b | `frontend-logic-implementer.md` | Phase4a-2（frontend 処理・純粋関数） | 契約＋実装済みの見た目＋frontend ロジックテスト(Red)＋framework 規約(あれば) | 🤖 機械ループ | 他の実装と別コンテキスト |
 | G2 | `backend-logic-implementer.md` | Phase4b（backend 処理・純粋関数） | 契約＋機能詳細＋backend テスト(Red)＋framework 規約(あれば) | 🤖 機械ループ | 他の実装と別コンテキスト |
@@ -278,14 +282,17 @@ B（skeleton 要否判定）と J（差し戻し判定）は、どの producer �
 
 ## 6. プラットフォーム / framework 固有規約（orchestrator が解決して渡す）
 
-実装 agent を起動する前に、対象の platform/framework を判定し、該当する**規約葉のパスを解決して各実装 agent の入力に渡す**（agent 自身にカタログを辿らせない）。これらの葉は非常駐（`paths:` gate）なので、必要時に Read で開いて渡す。
+producer（実装・DB 設計・テスト設計）を起動する前に、対象の platform/framework を判定し、該当する**規約葉のパスを解決して各 producer の入力に渡す**（agent 自身にカタログを辿らせない）。これらの葉は非常駐（`paths:` gate）なので、必要時に Read で開いて渡す。**規約は成果物ごとに宛先が違う**ので、下表の「渡す先」に沿って配る。
 
-| platform / framework | 参照する箱 / 葉 |
-|---|---|
-| Web / crow（PHP） | [crow/overview.md](../../rules/develop/web/crow/overview.md)（その箱の [coding.md](../../rules/develop/web/crow/coding.md) / [testing.md](../../rules/develop/web/crow/testing.md)） |
-| Native | （未登録 — 規約が無ければ渡さない） |
+| platform / framework | 参照する箱 / 葉 | 渡す先 |
+|---|---|---|
+| Web / crow（PHP） | [crow/overview.md](../../rules/develop/web/crow/overview.md)（[coding.md](../../rules/develop/web/crow/coding.md) / [testing.md](../../rules/develop/web/crow/testing.md) / [db.md](../../rules/develop/web/crow/db.md)） | coding → 実装3体（frontend-ui / frontend-logic / backend-logic）／testing → test-designer／db（`db_design.txt`） → db-designer |
+| Native | （未登録 — 規約が無ければ渡さない） | — |
 
-該当 framework が無ければ、framework 固有規約は渡さない（無いものを捏造しない）。
+- **coding 規約**は表面（html/css/js）も含むので frontend 実装体にも渡す（backend だけではない）。
+- **testing 規約（PHPUnit 等）は Red を書く test-designer に渡す**（テストを緑にする実装体ではなく、起票する側が従う）。
+- **DB 設計のネイティブ書式・住所は db-designer に渡す**（§4 docs 住所表のとおり、マイグレーション元があればそれが唯一の SSOT）。
+- 該当 framework が無ければ、framework 固有規約は渡さない（無いものを捏造しない）。
 
 ---
 
