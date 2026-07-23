@@ -13,7 +13,7 @@
 # 射影（.claude → .cursor）:
 #   rules/**/*.md   → rules/**/*.mdc   frontmatter `paths:`→`globs:`+`alwaysApply:false`
 #   skills/*/SKILL.md → skills/*/SKILL.md   複製（frontmatter は互換なので原文のまま）
-#   agents/**/*.md  → agents/**/*.md   複製＋`model:`を`inherit`へ正規化（opus/sonnet は Cursor で不解決の恐れ）
+#   agents/**/*.md  → agents/**/*.md   複製＋`model:`を`inherit`へ正規化（opus は Cursor で不解決の恐れ）
 #     ※ `tools:` は Cursor が解釈しないが害は無いので残す。read-only の規律は各 body の指示で担保。
 #
 # 使い方:
