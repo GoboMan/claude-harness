@@ -48,7 +48,18 @@
 
 ### 3.1 葉（rules）を足す
 
-1. 階層を決める: `rules/<scene>/<platform>/<framework>/<concern>.md`（例: `develop/web/crow/coding.md`）。
+1. 階層を決める: `rules/<scene>/<platform>/<framework>/<concern>.md`（例: `develop/web/crow/common/coding.md`）。framework の中でレイヤ（`common` / `frontend` / `backend`）に分かれるなら、その 1 段を挟んでよい（深いほど具体的）。**レイヤ側の葉は共通側への差分だけを持ち、共通ルールを写さない。**
+
+**ファイル名は配送先を決める予約語である。** develop skill §6-B は葉のファイル名から渡し先を機械的に決めるので、次の 3 つの名前は意味を守ること（守らないと配送が壊れる）。
+
+| ファイル名 | 意味＝配送先 |
+| --- | --- |
+| `coding.md` | プロダクションコードの記法 → 実装体 ＋ test-designer |
+| `testing.md` | テストの書き方 → test-designer のみ |
+| `db.md` | DB 設計の住所・書式 → db-designer のみ |
+| 上記以外の任意の名前 | その他の関心事 → 実装体のみ |
+
+`common/` に置いた葉は、レイヤ条件を外して上記の全宛先へ配られる。
 2. frontmatter に `paths:`（発火 glob）を必ず書く。
 3. **1 葉 = 1 関心事**（coding / testing / db …）。overview は入口リンクだけ。
 4. 目次への追記は不要（存在しない）。
@@ -117,6 +128,7 @@ model: opus | inherit        # 下記の割り当て規則に従う。Cursor 射
 | agent | producer≠oracle 分離／入力・出力契約が明示されているか／`model:` が §3.3 の割り当て規則どおりか（`sonnet` ベタ書きが無いか） |
 | cursor-sync | `paths`→`globs`・`alwaysApply: false`・`model: inherit`・GENERATED マーカ |
 | spec-lint | `.claude/tools/spec-lint/README.md` の使い方に沿い、producer が直接叩けること |
+| gate-hook | 常設にしない（設置は取り込み先の settings.local.json・任意有効化）／docs・`.claude` 配下を塞がない／ブロック理由が §1.5 の戻り先を示すこと |
 | init.sh | install / update / cursor のヘルプと README の記述が一致しているか |
 
 アプリの業務テストはこのリポジトリの主対象ではない。**配線の一貫性・常駐ゼロ・3木の整合**が品質の軸である。

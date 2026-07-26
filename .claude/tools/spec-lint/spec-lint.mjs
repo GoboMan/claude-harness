@@ -148,7 +148,11 @@ function parseFeaturesTable(body) {
 		rows.push({
 			id: idm[0],
 			name: cells[1] || "",
-			status: cells[cells.length - 1],
+			//  状態列は draft|fixed のセルを探す（工程列など他の列が末尾に来ても壊れないよう、
+			//  位置でなく値で特定する。見つからなければ旧来どおり末尾列にフォールバック）
+			status:
+				cells.find((c) => c === "draft" || c === "fixed") ||
+				cells[cells.length - 1],
 			link,
 		});
 	}

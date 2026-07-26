@@ -43,7 +43,7 @@ ADR は「なぜその設計を選んだか」を1決定1ファイルで残す�
 
 ```
 NNNN-YYYY-MM-DD-title.md
-例) 0007-2026-07-09-adopt-phpunit-for-crow.md
+例) 0007-2026-07-09-adopt-phpunit-for-backend-tests.md
 ```
 
 - **`NNNN`（通し番号・4桁ゼロ埋め）** = 安定した参照 ID。「ADR-0007」「ADR-0012 で置換」のように相互参照する。番号は新規採番のみで、欠番・再利用しない。
@@ -53,7 +53,7 @@ NNNN-YYYY-MM-DD-title.md
 ## テンプレート
 
 ```markdown
-# ADR-0007: crow のテストに PHPUnit を採用する
+# ADR-0007: backend のテストに PHPUnit を採用する
 
 - **Date**: 2026-07-09
 - **Status**: Accepted   <!-- Proposed / Accepted / Superseded by ADR-XXXX -->

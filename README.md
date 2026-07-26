@@ -31,7 +31,7 @@ AI（特に Claude）の**ベースライン・コンテキストをゼロに保
 
 ```text
 ① paths ゲート … 各葉の frontmatter `paths:` にマッチするファイルを触ると、その葉だけ注入
-   例) crow3_* 配下を触る          → web/crow/{overview,coding,testing,db}.md が載る
+   例) crow3_* 配下を触る          → web/crow/{common,frontend,backend}/*.md が載る
 
 ② skill エントリ … 手続きは skill として description 自動起動 or /name 明示起動
    例) 「開発したい」/develop → develop skill に orchestrator の核・実行台本が丸ごと載る
@@ -67,10 +67,19 @@ claude-harness/
       │    ├── develop/                    #   🎬 シーン: システム開発（旧 engineering）※判断核・台本は develop skill 内
       │    │    └── web/                    #     🖥️ プラットフォーム: Web（builder 規約）
       │    │         └── crow/              #       📦 framework: crow（PHP独自FW）
-      │    │              ├── overview.md   #         入口・全体像
-      │    │              ├── coding.md     #         コーディング規約
-      │    │              ├── testing.md    #         テスト設計（PHPUnit）
-      │    │              └── db.md         #         DB 設計の書式・住所（db_design.txt）
+      │    │              ├── common/       #         🔗 全レイヤ共通
+      │    │              │    ├── coding.md #          コーディング規約（共通スタイル）
+      │    │              │    └── testing.md #         テストの共通則
+      │    │              ├── frontend/     #         🎨 表面（HTML/CSS/JS）
+      │    │              │    ├── coding.md #          共通への上乗せ
+      │    │              │    ├── viewpart.md #        ビューパーツの構造規約
+      │    │              │    ├── viewpart-dataflow.md # 状態と単一方向フロー
+      │    │              │    ├── viewpart-components.md # 粒度と再利用（ui/parts/feature）
+      │    │              │    └── testing.md #         テスト設計（外部ランナー）
+      │    │              └── backend/      #         ⚙️ サーバ側（PHP）
+      │    │                   ├── coding.md #          共通への上乗せ
+      │    │                   ├── testing.md #         テスト設計（PHPUnit）
+      │    │                   └── db.md     #          DB 設計の書式・住所（db_design.txt）
       │    │
       │    └── translate-manga-ko-ja/       #   🈯 翻訳の型（overview/register/consistency/master-format/script-format）
       │
@@ -99,11 +108,12 @@ claude-harness/
       │
       └── tools/                            # 🔧 実行アセット（バリデータ・生成器）
            ├── spec-lint/                         # docs SSOT 検証（producer が直接叩く）
+           ├── gate-hook/                          # §1.5 実装着手ゲートの機械強制（PreToolUse フック・任意有効化）
            └── cursor-sync/                        # .claude の3木(rules/skills/agents) → Cursor の .cursor/ へ射影
 ```
 
-> 💡 **harness が同梱する機械チェックは「検証ツール」だけ**（`tools/spec-lint`＝docs SSOT 検証）。producer がタスク中に直接叩く。
-> **フック / CI への配線・ブランチ保護といった「設置」は各プロジェクトの責務**（かつて `enforcer` エージェント＋`conventions/enforcement/` が担ったが、入口 skill の廃止に伴い撤去）。durable な知識は agent body / rules に畳み、実行アセットは `.claude/tools/` に置く。
+> 💡 **harness が同梱する機械チェックは「検証ツール」まで**（`tools/spec-lint`＝docs SSOT 検証、`tools/gate-hook`＝§1.5 の書き込み時停止線）。spec-lint は producer がタスク中に直接叩く。
+> **フック / CI への配線・ブランチ保護といった「設置」は各プロジェクトの責務**（gate-hook もスクリプト＋手順の同梱までで、settings への配線＝有効化は取り込み先の任意。かつて `enforcer` エージェント＋`conventions/enforcement/` が担った常設の強制は撤去済み）。durable な知識は agent body / rules に畳み、実行アセットは `.claude/tools/` に置く。
 
 ## 🧱 手続きの3木（skills / agents / rules を同じキーで揃える）
 
@@ -167,7 +177,7 @@ cd /path/to/your-project
 ユーザーが「crow で作った画面のバグを直して」と依頼した場合：
 
 1. AI は `/develop` を起動（明示、または skill の `description` で自動）。メインエージェントが **orchestrator** になる。
-2. orchestrator の判断核・実行台本は develop skill 本文に載っており（別ファイル Read 不要）、対象は **web/crow** と判断。`crow3_*` 配下を触ると `web/crow/` の葉（`coding.md` 等）が `paths` ゲートで載る。
+2. orchestrator の判断核・実行台本は develop skill 本文に載っており（別ファイル Read 不要）、対象は **web/crow** と判断。`crow3_*` 配下を触ると `web/crow/` の葉（`common/coding.md` 等）が `paths` ゲートで載る。
 3. orchestrator が `.claude/agents/develop/` の専門サブエージェントを順に Task 起動し、修正を進める（人間ゲートは orchestrator が担当、commit は `committer` に委譲）。
 4. **native や routines のルールは一切載らない**（常駐ゼロ。触っていない葉は 0 バイトもロードされない）。
 
@@ -204,7 +214,7 @@ cd /path/to/your-project
 
 新しいルールを足すときは「葉を生やして `paths` を付ける」だけです。目次への追記は要りません。
 
-1. 適切な階層にケース Markdown を追加（例: `web/crow/coding.md`、新 framework なら `web/laravel/coding.md`）。
+1. 適切な階層にケース Markdown を追加（例: `web/crow/backend/coding.md`、新 framework なら `web/laravel/coding.md`）。
 2. その葉の frontmatter に `paths:`（発火するファイルの glob）を書く。手続きが要るなら skill を足す。
 3. 完了。**常駐する目次が無いので、他ファイルの書き換えは不要。**
 

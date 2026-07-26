@@ -55,7 +55,7 @@ model: inherit
 <footer>
 ```
 
-- **type**（必須）と **subject**（必須）以外は任意。`scope` は対象領域（例: `crow`, `docs`）。
+- **type**（必須）と **subject**（必須）以外は任意。`scope` は対象領域（例: `auth`, `docs`）。
 
 ### type 一覧
 
@@ -92,7 +92,7 @@ model: inherit
 ### 例
 
 ```
-feat(crow): 予約フォームの入力検証を追加
+feat(reservation): 予約フォームの入力検証を追加
 
 未入力・桁あふれ・不正文字を弾く。GWT の失敗系ケースに対応。
 入力値は i_ 変数として受け、check_value で判定する。
