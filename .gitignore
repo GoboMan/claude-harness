@@ -12,3 +12,6 @@ Icon?
 
 # ログ・一時ファイル
 *.log
+
+# Cursor 射影（生成物。取り込み先/検証用に ./init.sh cursor で再生成する）
+.cursor/
