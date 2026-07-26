@@ -197,6 +197,65 @@ function checkSections(file, body, required, status) {
 	}
 }
 
+//  --- docs 衛生（負のリスト混入の検出。負のリストの SSOT は各 producer craft:
+//      ssot-definer §B「spec に書かないもの」/ contract-author「契約に書かないもの」）---
+//  すべて warn（既存プロジェクトの validate を err で即死させない）。
+//  spec/contract は「現在形の不変条件」だけを持つ。改訂経緯・理由・実測・未決・
+//  実装アンカーの混入は SSOT 肥大の兆候として警告する。
+function checkHygiene(file, body, kind) {
+	const lines = body.split(/\r?\n/);
+
+	//  1) 冒頭ナラティブ: フロントマター直後〜最初のセクションまでの blockquote 群。
+	//     改訂のたびに差分説明が積まれるパターン（1 日で spec が 3 倍化した実例の主因）。
+	let preambleQuotes = 0;
+	for (const line of lines) {
+		if (/^##\s/.test(line)) break;
+		if (line.trim().startsWith(">")) preambleQuotes++;
+	}
+	if (preambleQuotes > 3)
+		warn(
+			file,
+			`冒頭に blockquote が ${preambleQuotes} 行（改訂経緯は commit message、理由・実測は ADR へ。本文は現在形に統合する）`,
+		);
+
+	//  2) 本文中の日付括弧: 「（2026-07-26 改訂）」のような経緯の追記痕。
+	const dates = body.match(/[（(]\d{4}-\d{2}-\d{2}/g) || [];
+	if (dates.length > 0)
+		warn(file, `本文中に日付括弧の経緯記述が ${dates.length} 件（経緯は git が持つ。本文は現在形に統合する）`);
+
+	//  3) 実装アンカー: コード側ファイルへのパス／行番号参照。コードが SSOT なので
+	//     docs に書くと腐る。契約はアクション名・エンドポイントが本業のため、
+	//     行番号付き（明確に実装確認の痕跡）のみ警告する。
+	const anchorRe =
+		kind === "spec"
+			? /[\w./-]+\.(php|js|ts|jsx|tsx|sql|mjs|cjs|py|rb|go|java)\b(:\d+(-\d+)?)?/g
+			: /[\w./-]+\.(php|js|ts|jsx|tsx|sql|mjs|cjs|py|rb|go|java)\b:\d+(-\d+)?/g;
+	const anchors = body.match(anchorRe) || [];
+	if (anchors.length > 0)
+		warn(file, `実装アンカーが ${anchors.length} 件（例: ${anchors[0]}）— コードが SSOT。docs に書かない`);
+
+	if (kind === "spec") {
+		//  4) framework 内部 API への言及（クラス::メソッド 形式）
+		const scopeRefs = body.match(/\w+::\w+/g) || [];
+		if (scopeRefs.length > 0)
+			warn(
+				file,
+				`内部 API 参照が ${scopeRefs.length} 件（例: ${scopeRefs[0]}）— spec は観測可能な振る舞いの語彙で書く`,
+			);
+
+		//  5) 未決の堆積セクション（fixed spec に未決を溜めない）
+		for (const s of getSections(body)) {
+			if (/既知の課題|残存リスク|バックログ/.test(s.title))
+				warn(file, `セクション「${s.title}」— 未解決論点・リスクは issue 管理へ排出する`);
+		}
+	}
+
+	//  6) 肥大の煙探知機
+	const maxLines = kind === "spec" ? 300 : 400;
+	if (lines.length > maxLines)
+		warn(file, `本文が ${lines.length} 行（${maxLines} 行超）— 1 関心事を超えた堆積の疑い（負のリスト該当を排出する）`);
+}
+
 //  --- ファイル種別ごとの検証 ---
 function validateFeatureSpec(file, text) {
 	const { data, body } = parseFrontmatter(text);
@@ -204,6 +263,7 @@ function validateFeatureSpec(file, text) {
 	const status = checkStatus(file, data);
 	checkSections(file, body, SPEC_SECTIONS, status);
 	checkSentinels(file, text, status);
+	checkHygiene(file, body, "spec");
 	//  状態セクションにハッピーパス以外が含まれるか（fixed のみ・警告）
 	const states = findSection(body, (t) => t.startsWith("状態"));
 	const statesText = states ? states.lines.join("") : "";
@@ -224,6 +284,7 @@ function validateContract(file, text) {
 	const status = checkStatus(file, data);
 	checkSections(file, body, CONTRACT_SECTIONS, status);
 	checkSentinels(file, text, status);
+	checkHygiene(file, body, "contract");
 	const reqSec = findSection(body, (t) => /^request/i.test(t));
 	const requestParams = reqSec ? tableFirstColumn(reqSec.lines) : [];
 	const errSec = findSection(body, (t) => /^response/i.test(t) && t.includes("異常"));
