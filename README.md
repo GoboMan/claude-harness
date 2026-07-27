@@ -32,6 +32,7 @@ AI（特に Claude）の**ベースライン・コンテキストをゼロに保
 ```text
 ① paths ゲート … 各葉の frontmatter `paths:` にマッチするファイルを触ると、その葉だけ注入
    例) crow3_* 配下を触る          → web/crow/{common,frontend,backend}/*.md が載る
+       *.tsx / *.ts を触る          → native/expo/{common,frontend}/*.md が載る
 
 ② skill エントリ … 手続きは skill として description 自動起動 or /name 明示起動
    例) 「開発したい」/develop → develop skill に orchestrator の核・実行台本が丸ごと載る
@@ -65,21 +66,32 @@ claude-harness/
       │
       ├── rules/                           # 📦 葉のみ。目次(index.md)は持たない
       │    ├── develop/                    #   🎬 シーン: システム開発（旧 engineering）※判断核・台本は develop skill 内
-      │    │    └── web/                    #     🖥️ プラットフォーム: Web（builder 規約）
-      │    │         └── crow/              #       📦 framework: crow（PHP独自FW）
-      │    │              ├── common/       #         🔗 全レイヤ共通
-      │    │              │    ├── coding.md #          コーディング規約（共通スタイル）
-      │    │              │    └── testing.md #         テストの共通則
-      │    │              ├── frontend/     #         🎨 表面（HTML/CSS/JS）
-      │    │              │    ├── coding.md #          共通への上乗せ
-      │    │              │    ├── viewpart.md #        ビューパーツの構造規約
-      │    │              │    ├── viewpart-dataflow.md # 状態と単一方向フロー
-      │    │              │    ├── viewpart-components.md # 粒度と再利用（ui/parts/feature）
-      │    │              │    └── testing.md #         テスト設計（外部ランナー）
-      │    │              └── backend/      #         ⚙️ サーバ側（PHP）
-      │    │                   ├── coding.md #          共通への上乗せ
-      │    │                   ├── testing.md #         テスト設計（PHPUnit）
-      │    │                   └── db.md     #          DB 設計の書式・住所（db_design.txt）
+      │    │    ├── web/                   #     🖥️ プラットフォーム: Web（builder 規約）
+      │    │    │    └── crow/             #       📦 framework: crow（PHP独自FW）
+      │    │    │         ├── common/      #         🔗 全レイヤ共通
+      │    │    │         │    ├── coding.md #          コーディング規約（共通スタイル）
+      │    │    │         │    └── testing.md #         テストの共通則
+      │    │    │         ├── frontend/    #         🎨 表面（HTML/CSS/JS）
+      │    │    │         │    ├── coding.md #          共通への上乗せ
+      │    │    │         │    ├── viewpart.md #        ビューパーツの構造規約
+      │    │    │         │    ├── viewpart-dataflow.md # 状態と単一方向フロー
+      │    │    │         │    ├── viewpart-components.md # 粒度と再利用（ui/parts/feature）
+      │    │    │         │    └── testing.md #         テスト設計（外部ランナー）
+      │    │    │         └── backend/     #         ⚙️ サーバ側（PHP）
+      │    │    │              ├── coding.md #          共通への上乗せ
+      │    │    │              ├── testing.md #         テスト設計（PHPUnit）
+      │    │    │              └── db.md    #          DB 設計の書式・住所（db_design.txt）
+      │    │    ├── native/                #     📱 プラットフォーム: モバイルネイティブ
+      │    │    │    └── expo/             #       📦 framework: Expo（expo-router / React Native）
+      │    │    │         ├── common/      #         🔗 全レイヤ共通
+      │    │    │         │    ├── coding.md #          TS の共通則・秘密と依存の境界
+      │    │    │         │    └── testing.md #         ランナー契約（jest-expo）・決定性
+      │    │    │         └── frontend/    #         🎨 アプリ本体（RN アプリ＝frontend レイヤ）
+      │    │    │              ├── coding.md #          RN は Web ではない（表面の差分）
+      │    │    │              ├── routing.md #         expo-router の住所と遷移
+      │    │    │              ├── dataflow.md #        サーバ状態/クライアント状態・単一方向
+      │    │    │              ├── components.md #      粒度と UI/ロジック実装体の分担
+      │    │    │              └── testing.md #         テスト設計（RNTL）
       │    │
       │    └── translate-manga-ko-ja/       #   🈯 翻訳の型（overview/register/consistency/master-format/script-format）
       │
@@ -89,7 +101,7 @@ claude-harness/
       │    │    ├── db-designer.md, contract-author.md  # Phase3 構造（DB＝人間ゲート／契約＝機械）
       │    │    ├── structure-oracle.md            # 構造整合の独立判定
       │    │    ├── test-designer.md               # GWT＋契約から Red テスト（実装前）
-      │    │    ├── frontend-ui-implementer.md     # Phase4a-1 見た目（html/css/js）
+      │    │    ├── frontend-ui-implementer.md     # Phase4a-1 見た目（ビュー層・媒体は platform 依存）
       │    │    ├── frontend-logic-implementer.md  # Phase4a-2 frontend 処理・純粋関数
       │    │    ├── backend-logic-implementer.md   # Phase4b backend 処理・純粋関数
       │    │    ├── slice-attacker.md, system-attacker.md # 攻撃（スライス／横断）
