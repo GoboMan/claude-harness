@@ -11,7 +11,7 @@ model: opus
 
 ## 入力契約（orchestrator から受け取る）
 
-- **判定対象の構造成果物**: 機能詳細（`docs/spec/`）・DB 設計・契約（`docs/contracts/`）。
+- **判定対象の構造成果物**: 機能詳細（`docs/specs/F-xxx-<slug>/spec.md`）・DB 設計・契約（同ディレクトリの `api-contract.yaml`、OpenAPI 3.1）。
 - **再判定ラウンドの場合**: 前回の不整合リスト＋今回変更された成果物。
 
 ## クラフト（あなたの専門技能）
