@@ -11,7 +11,7 @@
 
 - **常駐ゼロを崩さない。** `index.md` やカタログ目次を復活させない。`settings.json` に自動注入を足さない（現状 `{}`）。
 - **プロジェクト固有の逸脱をここに書かない。** 共有 harness は汎用のみ。案件ごとの事実は、取り込み先プロジェクトの `CLAUDE.md` へ。
-- **同じ知識を二重化しない。** 書式の SSOT は 1 箇所（rules の葉、または生成する agent body）。skill に craft / 書式をコピペしない。
+- **同じ知識を二重化しない。** 書式の SSOT は 1 箇所（rules の葉・`templates/` のテンプレート・または生成する agent body）。skill に craft / 書式をコピペしない。docs 成果物の書式はテンプレートが正で、spec-lint は必須項目をテンプレートから導出する（lint 側に書式を再記述しない）。
 - **`.cursor/` を手で編集しない。** Cursor 射影は生成物。直すなら `.claude/` を直し `./init.sh cursor`（または `.claude/tools/cursor-sync/sync.sh`）で再生成。
 
 ---
@@ -26,7 +26,7 @@
 | 常駐ゼロ | ベースラインに載るルールは 0。発見は `paths` ゲートと skill 起動だけ |
 | 3木揃え | 手続きキー `<key>` は `skills/<key>`・`agents/<key>`・`rules/<key>` で同名 |
 | 作る ≠ 判定する | producer と oracle/attacker/judge は別 agent・別コンテキスト |
-| skill = 回し方 | orchestrator の判断核・台本のみ。型は rules、craft は agent body |
+| skill = 回し方 | orchestrator の判断核・台本のみ。型は rules／templates、craft は agent body |
 
 ---
 
@@ -36,7 +36,8 @@
 | --- | --- | --- |
 | 規約・書式・型（関心ごと 1 葉） | `rules/<key>/.../<leaf>.md` | 葉の `paths:` にマッチしたファイルを触った時 |
 | 手続きの入口・orchestrator 台本 | `skills/<name>/SKILL.md` | `/name` または `description` 自動起動 |
-| 専門サブエージェントの人格・craft・書式 | `agents/<key>/<name>.md` | orchestrator が Task 起動した時だけ |
+| 専門サブエージェントの人格・craft（書き方の判断規則） | `agents/<key>/<name>.md` | orchestrator が Task 起動した時だけ |
+| docs 成果物の雛形（書式の SSOT。spec-lint が必須項目を導出） | `templates/<key>/<name>.(md\|yaml)` | producer が雛形として Read した時 |
 | 実行アセット（lint・射影スクリプト） | `tools/<name>/` | producer / init が直接叩く時 |
 | 導入・更新・Cursor 射影 | ルートの `init.sh` | 人間が明示実行 |
 
@@ -127,8 +128,9 @@ model: opus | inherit        # 下記の割り当て規則に従う。Cursor 射
 | skill | description が起動トリガーになるか／orchestrator が自分でコードを書かない指示があるか |
 | agent | producer≠oracle 分離／入力・出力契約が明示されているか／`model:` が §3.3 の割り当て規則どおりか（`sonnet` ベタ書きが無いか） |
 | cursor-sync | `paths`→`globs`・`alwaysApply: false`・`model: inherit`・GENERATED マーカ |
-| spec-lint | `.claude/tools/spec-lint/README.md` の使い方に沿い、producer が直接叩けること |
-| gate-hook | 常設にしない（設置は取り込み先の settings.local.json・任意有効化）／docs・`.claude` 配下を塞がない／ブロック理由が §1.5 の戻り先を示すこと |
+| templates | 1 成果物 1 テンプレート／プレースホルダが `F-000`・`YYYY-MM-DD`・`<...>` に統一されているか／spec-lint の導出（必須セクション・必須 `x-` キー）が壊れないか |
+| spec-lint | `.claude/tools/spec-lint/README.md` の使い方に沿い、producer が直接叩けること。書式はテンプレートから導出し、lint 側に再記述しない |
+| gate-hook | 常設にしない（設置は取り込み先の settings.local.json・任意有効化）／docs・`.claude` 配下を塞がない／ブロック理由が develop skill §2 の戻り先を示すこと |
 | init.sh | install / update / cursor のヘルプと README の記述が一致しているか |
 
 アプリの業務テストはこのリポジトリの主対象ではない。**配線の一貫性・常駐ゼロ・3木の整合**が品質の軸である。

@@ -2,10 +2,17 @@
 //
 //  spec-lint — docs SSOT のフォーマット / ライフサイクル検証（harness 同梱ツール）
 //
-//  検証対象の書式は producer サブエージェントの craft（agent body）が定める:
-//    agents/develop/ssot-definer.md   §A/§B  (docs/spec/features.md, docs/spec/<feature>.md)
-//    agents/develop/contract-author.md 書式リファレンス (docs/contracts/<feature>.md)
-//  その書式をコードに落とした実行仕様が本ファイル。
+//  検証対象のレイアウト（1 機能 1 ディレクトリ）:
+//    docs/PRD.md                             【任意】Why / スコープ / 横断業務原則
+//    docs/design.md                          【任意】How の現在形
+//    docs/specs/specs.md                     台帳（全機能一覧・工程列）
+//    docs/specs/_shared/components.yaml      契約の共有語彙（$ref 先）
+//    docs/specs/F-xxx-<slug>/spec.md         機能詳細（SSOT・GWT）
+//    docs/specs/F-xxx-<slug>/api-contract.yaml  処理インターフェース契約（OpenAPI 3.1）
+//
+//  書式の SSOT は .claude/templates/develop/ のテンプレート。本ツールは
+//  spec.md の必須セクション・必須フロントマター・契約の必須 x- キーを
+//  テンプレートから導出する（書式改定はテンプレートを直せば lint も追従する）。
 //
 //  使い方:
 //    node spec-lint.mjs validate [--docs docs]      全 docs を検証（フォーマット＋不変条件）
@@ -16,28 +23,19 @@
 //
 
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
-import { join, basename } from "node:path";
+import { join, dirname, basename } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const SENTINELS = ["F-000", "YYYY-MM-DD", "<feature>"];
+const TEMPLATE_DIR = join(
+	dirname(fileURLToPath(import.meta.url)),
+	"..",
+	"..",
+	"templates",
+	"develop",
+);
 
-const SPEC_SECTIONS = [
-	{ key: "目的", test: (t) => t.startsWith("目的") },
-	{ key: "アクター・権限", test: (t) => t.startsWith("アクター") },
-	{ key: "入力", test: (t) => t.startsWith("入力") },
-	{ key: "出力", test: (t) => t.startsWith("出力") },
-	{ key: "状態", test: (t) => t.startsWith("状態") },
-	{ key: "受け入れ条件", test: (t) => t.startsWith("受け入れ") },
-	{ key: "業務ルール", test: (t) => t.startsWith("業務") },
-];
-
-const CONTRACT_SECTIONS = [
-	{ key: "エンドポイント", test: (t) => t.startsWith("エンドポイント") },
-	{ key: "Request", test: (t) => /^request/i.test(t) },
-	{ key: "Response（正常）", test: (t) => /^response/i.test(t) && t.includes("正常") },
-	{ key: "Response（異常）", test: (t) => /^response/i.test(t) && t.includes("異常") },
-	{ key: "エラーコード一覧", test: (t) => t.startsWith("エラーコード") },
-	{ key: "具体例", test: (t) => t.startsWith("具体例") },
-];
+const SENTINELS = ["F-000", "YYYY-MM-DD"];
+const DIR_RE = /^F-\d+-[a-z0-9-]+$/;
 
 //  --- 収集した違反 ---
 const errors = [];
@@ -81,16 +79,10 @@ function getSections(body) {
 	return secs;
 }
 
-function sectionFilled(sec) {
-	return sec.lines.some((l) => l.trim().length > 0);
-}
+const sectionFilled = (sec) => sec.lines.some((l) => l.trim().length > 0);
+const findSection = (body, test) => getSections(body).find((s) => test(s.title));
 
-function findSection(body, test) {
-	return getSections(body).find((s) => test(s.title));
-}
-
-//  マークダウン表の1列目（＝名前列）を拾う。ヘッダ行（＝最初の行）・区切り行は
-//  位置で除外する（キーワード判定にすると "name" 等の実パラメータ名を誤って落とす）。
+//  マークダウン表の1列目（＝名前列）を拾う。ヘッダ行・区切り行は位置で除外。
 function tableFirstColumn(lines) {
 	const names = [];
 	let seenHeader = false;
@@ -114,68 +106,61 @@ function tableFirstColumn(lines) {
 }
 
 //  入力名/リクエスト名の突き合わせ用に正規化（crow の i_ 接頭辞を吸収）
-function normName(n) {
-	return n
-		.replace(/`/g, "")
-		.trim()
-		.replace(/^i_/, "")
-		.toLowerCase();
+const normName = (n) =>
+	n.replace(/`/g, "").trim().replace(/^i_/, "").toLowerCase();
+
+//  --- テンプレートからの書式導出（fallback はテンプレート欠落時のみ）---
+function deriveSpecFormat() {
+	const file = join(TEMPLATE_DIR, "spec.md");
+	const fallback = {
+		fmKeys: ["機能ID", "機能名", "ステータス", "更新日"],
+		sections: ["目的", "アクター・権限", "入力", "出力", "状態", "受け入れ条件", "業務ルール"],
+	};
+	if (!existsSync(file)) return fallback;
+	const { data, body } = parseFrontmatter(readFileSync(file, "utf8"));
+	const fmKeys = Object.keys(data);
+	//  見出しの先頭語（空白・括弧の前まで）を必須セクションのキーとする
+	const sections = getSections(body).map((s) => s.title.split(/[\s（(]/)[0]);
+	if (fmKeys.length === 0 || sections.length === 0) return fallback;
+	return { fmKeys, sections };
 }
 
-function countTableRows(lines) {
-	return tableFirstColumn(lines).length;
-}
-
-function parseFeaturesTable(body) {
-	const rows = [];
-	for (const line of body.split(/\r?\n/)) {
-		const t = line.trim();
-		if (!t.startsWith("|")) continue;
-		const cells = t
-			.split("|")
-			.slice(1, -1)
-			.map((c) => c.trim());
-		const idm = cells[0] && cells[0].match(/F-\d+/);
-		if (!idm) continue; //  ヘッダ・区切り行を飛ばす
-		let link = null;
-		for (const c of cells) {
-			const lm = c.match(/\]\(([^)]+)\)/);
-			if (lm) {
-				link = lm[1];
-				break;
-			}
-		}
-		rows.push({
-			id: idm[0],
-			name: cells[1] || "",
-			//  状態列は draft|fixed のセルを探す（工程列など他の列が末尾に来ても壊れないよう、
-			//  位置でなく値で特定する。見つからなければ旧来どおり末尾列にフォールバック）
-			status:
-				cells.find((c) => c === "draft" || c === "fixed") ||
-				cells[cells.length - 1],
-			link,
-		});
+function deriveContractKeys() {
+	const file = join(TEMPLATE_DIR, "api-contract.yaml");
+	const fallback = ["x-feature-id", "x-status", "x-spec", "x-updated"];
+	if (!existsSync(file)) return fallback;
+	const keys = [];
+	for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
+		const m = line.match(/^(x-[\w-]+):/);
+		if (m) keys.push(m[1]);
 	}
-	return rows;
+	return keys.length > 0 ? keys : fallback;
 }
 
+//  --- 共通チェック ---
 function checkSentinels(file, text, status) {
 	if (status !== "fixed") return;
 	for (const s of SENTINELS) {
 		if (text.includes(s))
 			err(file, `fixed なのにテンプレのプレースホルダが残っている: "${s}"`);
 	}
+	const angle = text.match(/<[^>\n]{1,40}>/g) || [];
+	for (const a of angle) {
+		//  <機能名> のような全角含みプレースホルダのみ（HTML タグ等は対象外）
+		if (/[^\x00-\x7F]/.test(a)) {
+			err(file, `fixed なのにプレースホルダが残っている: "${a}"`);
+			break;
+		}
+	}
 }
 
-function checkStatus(file, data) {
-	const s = data["ステータス"];
+function checkStatus(file, s, label = "ステータス") {
 	if (!s) {
-		err(file, "フロントマターに ステータス が無い");
+		err(file, `${label} が無い`);
 		return null;
 	}
-	if (s !== "draft" && s !== "fixed") {
-		err(file, `ステータスは draft|fixed のいずれか。実際: "${s}"`);
-	}
+	if (s !== "draft" && s !== "fixed")
+		err(file, `${label} は draft|fixed のいずれか。実際: "${s}"`);
 	return s;
 }
 
@@ -187,45 +172,41 @@ function checkRequiredFm(file, data, keys) {
 
 function checkSections(file, body, required, status) {
 	const secs = getSections(body);
-	for (const req of required) {
-		const found = secs.find((s) => req.test(s.title));
+	for (const key of required) {
+		const found = secs.find((s) => s.title.startsWith(key));
 		if (!found) {
-			err(file, `必須セクション "${req.key}" が無い`);
+			err(file, `必須セクション "${key}" が無い`);
 		} else if (status === "fixed" && !sectionFilled(found)) {
-			err(file, `fixed なのにセクション "${req.key}" が空`);
+			err(file, `fixed なのにセクション "${key}" が空`);
 		}
 	}
 }
 
-//  --- docs 衛生（負のリスト混入の検出。負のリストの SSOT は各 producer craft:
-//      ssot-definer §B「spec に書かないもの」/ contract-author「契約に書かないもの」）---
+//  --- docs 衛生（負のリスト混入の検出。SSOT は各 producer craft）---
 //  すべて warn（既存プロジェクトの validate を err で即死させない）。
-//  spec/contract は「現在形の不変条件」だけを持つ。改訂経緯・理由・実測・未決・
-//  実装アンカーの混入は SSOT 肥大の兆候として警告する。
 function checkHygiene(file, body, kind) {
 	const lines = body.split(/\r?\n/);
 
-	//  1) 冒頭ナラティブ: フロントマター直後〜最初のセクションまでの blockquote 群。
-	//     改訂のたびに差分説明が積まれるパターン（1 日で spec が 3 倍化した実例の主因）。
-	let preambleQuotes = 0;
-	for (const line of lines) {
-		if (/^##\s/.test(line)) break;
-		if (line.trim().startsWith(">")) preambleQuotes++;
+	//  1) 冒頭ナラティブ: 最初のセクションまでの blockquote 群（改訂差分の堆積痕）
+	if (kind === "spec") {
+		let preambleQuotes = 0;
+		for (const line of lines) {
+			if (/^##\s/.test(line)) break;
+			if (line.trim().startsWith(">")) preambleQuotes++;
+		}
+		if (preambleQuotes > 3)
+			warn(
+				file,
+				`冒頭に blockquote が ${preambleQuotes} 行（改訂経緯は commit message、理由・実測は ADR へ。本文は現在形に統合する）`,
+			);
 	}
-	if (preambleQuotes > 3)
-		warn(
-			file,
-			`冒頭に blockquote が ${preambleQuotes} 行（改訂経緯は commit message、理由・実測は ADR へ。本文は現在形に統合する）`,
-		);
 
-	//  2) 本文中の日付括弧: 「（2026-07-26 改訂）」のような経緯の追記痕。
+	//  2) 本文中の日付括弧: 「（2026-07-26 改訂）」のような経緯の追記痕
 	const dates = body.match(/[（(]\d{4}-\d{2}-\d{2}/g) || [];
 	if (dates.length > 0)
 		warn(file, `本文中に日付括弧の経緯記述が ${dates.length} 件（経緯は git が持つ。本文は現在形に統合する）`);
 
-	//  3) 実装アンカー: コード側ファイルへのパス／行番号参照。コードが SSOT なので
-	//     docs に書くと腐る。契約はアクション名・エンドポイントが本業のため、
-	//     行番号付き（明確に実装確認の痕跡）のみ警告する。
+	//  3) 実装アンカー: コード側ファイルへのパス／行番号参照（コードが SSOT）
 	const anchorRe =
 		kind === "spec"
 			? /[\w./-]+\.(php|js|ts|jsx|tsx|sql|mjs|cjs|py|rb|go|java)\b(:\d+(-\d+)?)?/g
@@ -256,12 +237,12 @@ function checkHygiene(file, body, kind) {
 		warn(file, `本文が ${lines.length} 行（${maxLines} 行超）— 1 関心事を超えた堆積の疑い（負のリスト該当を排出する）`);
 }
 
-//  --- ファイル種別ごとの検証 ---
-function validateFeatureSpec(file, text) {
+//  --- spec.md の検証 ---
+function validateFeatureSpec(file, text, fmt) {
 	const { data, body } = parseFrontmatter(text);
-	checkRequiredFm(file, data, ["機能ID", "機能名", "ステータス", "更新日"]);
-	const status = checkStatus(file, data);
-	checkSections(file, body, SPEC_SECTIONS, status);
+	checkRequiredFm(file, data, fmt.fmKeys);
+	const status = checkStatus(file, data["ステータス"]);
+	checkSections(file, body, fmt.sections, status);
 	checkSentinels(file, text, status);
 	checkHygiene(file, body, "spec");
 	//  状態セクションにハッピーパス以外が含まれるか（fixed のみ・警告）
@@ -270,7 +251,7 @@ function validateFeatureSpec(file, text) {
 	if (status === "fixed" && states) {
 		for (const kw of ["error", "empty", "権限"]) {
 			if (!statesText.includes(kw))
-				warn(file, `状態に "${kw}" 系の記述が見当たらない（機能詳細の書式＝ssot-definer §B 参照）`);
+				warn(file, `状態に "${kw}" 系の記述が見当たらない（テンプレート templates/develop/spec.md 参照）`);
 		}
 	}
 	const inputSec = findSection(body, (t) => t.startsWith("入力"));
@@ -278,165 +259,253 @@ function validateFeatureSpec(file, text) {
 	return { id: data["機能ID"] || null, status, inputs, statesText };
 }
 
-function validateContract(file, text) {
-	const { data, body } = parseFrontmatter(text);
-	checkRequiredFm(file, data, ["機能ID", "機能名", "ステータス", "更新日", "機能詳細"]);
-	const status = checkStatus(file, data);
-	checkSections(file, body, CONTRACT_SECTIONS, status);
-	checkSentinels(file, text, status);
-	checkHygiene(file, body, "contract");
-	const reqSec = findSection(body, (t) => /^request/i.test(t));
-	const requestParams = reqSec ? tableFirstColumn(reqSec.lines) : [];
-	const errSec = findSection(body, (t) => /^response/i.test(t) && t.includes("異常"));
-	const errorRows = errSec ? countTableRows(errSec.lines) : 0;
-	return {
-		id: data["機能ID"] || null,
-		status,
-		specLink: data["機能詳細"] || null,
-		requestParams,
-		errorRows,
-	};
+//  --- api-contract.yaml の検証（依存ゼロの行スキャン。構文の完全検証は
+//      producer が redocly/spectral で行う前提で、ここではライフサイクル・
+//      参照整合・spec との突き合わせに限定する）---
+function topLevelYamlKeys(text) {
+	const keys = {};
+	for (const line of text.split(/\r?\n/)) {
+		const m = line.match(/^([\w-]+):\s*(.*)$/);
+		if (m) keys[m[1]] = m[2].replace(/\s+#.*$/, "").replace(/^["']|["']$/g, "").trim();
+	}
+	return keys;
 }
 
-function listMd(dir) {
-	if (!existsSync(dir) || !statSync(dir).isDirectory()) return [];
-	return readdirSync(dir)
-		.filter((f) => f.endsWith(".md"))
-		.map((f) => join(dir, f));
+function validateContract(file, text, dirId, xKeys) {
+	const keys = topLevelYamlKeys(text);
+
+	if (!keys["openapi"]) err(file, `トップレベル "openapi:" が無い（OpenAPI 3.1 で書く）`);
+	else if (!keys["openapi"].startsWith("3.1"))
+		warn(file, `openapi バージョンが 3.1 系でない: "${keys["openapi"]}"`);
+	if (!/^paths:/m.test(text)) err(file, `トップレベル "paths:" が無い`);
+
+	for (const k of xKeys) {
+		if (!(k in keys) || keys[k].length === 0) err(file, `必須キー "${k}" が空/欠落`);
+	}
+	const status = checkStatus(file, keys["x-status"], "x-status");
+	const id = keys["x-feature-id"] || null;
+	if (id && dirId && id !== dirId)
+		err(file, `x-feature-id "${id}" がディレクトリ名の ID "${dirId}" と不一致`);
+
+	//  x-spec の解決
+	if (keys["x-spec"]) {
+		const target = join(dirname(file), keys["x-spec"]);
+		if (!existsSync(target)) err(file, `x-spec が解決しない: ${keys["x-spec"]}`);
+	}
+
+	//  $ref の解決（相対ファイルの存在＋アンカー末尾キーの存在）
+	for (const m of text.matchAll(/\$ref:\s*["']?([^"'\s]+)["']?/g)) {
+		const ref = m[1];
+		const [path, anchor] = ref.split("#");
+		let targetText = text;
+		if (path) {
+			const target = join(dirname(file), path);
+			if (!existsSync(target)) {
+				err(file, `$ref のファイルが無い: ${path}`);
+				continue;
+			}
+			targetText = readFileSync(target, "utf8");
+		}
+		if (anchor) {
+			const leaf = anchor.split("/").filter(Boolean).pop();
+			if (leaf && !new RegExp(`^\\s+${leaf}:`, "m").test(targetText))
+				err(file, `$ref のアンカーが見つからない: ${ref}`);
+		}
+	}
+
+	checkSentinels(file, text, status);
+	checkHygiene(file, text, "contract");
+
+	//  具体例（fixed のみ）
+	if (status === "fixed" && !/^\s+examples?:/m.test(text))
+		warn(file, `fixed なのに examples が無い（正常 1 件＋異常 1 件以上の実値を書く）`);
+
+	//  異常系レスポンスの行数相当（4xx/5xx キーの検出）
+	const errorResponses = (text.match(/^\s+["']?[45]\d\d["']?:/gm) || []).length;
+	return { id, status, errorResponses };
+}
+
+//  --- PRD / design（任意ファイル・warn 中心）---
+function validateRootDoc(file, kind) {
+	if (!existsSync(file)) return;
+	const { data, body } = parseFrontmatter(readFileSync(file, "utf8"));
+	if (!data["ステータス"] || !data["更新日"])
+		warn(file, `フロントマター（ステータス/更新日）が無い`);
+	if (kind === "prd") {
+		//  機能別の受け入れ条件は spec の関心事（境界の機械チェック）
+		if (/Given|When|Then|受け入れ条件/.test(body))
+			warn(file, `GWT/受け入れ条件らしき記述がある — 機能別の受け入れ条件は docs/specs/F-xxx/spec.md へ`);
+	}
+}
+
+//  --- 台帳（specs.md）---
+function parseLedgerTable(body) {
+	const rows = [];
+	for (const line of body.split(/\r?\n/)) {
+		const t = line.trim();
+		if (!t.startsWith("|")) continue;
+		const cells = t
+			.split("|")
+			.slice(1, -1)
+			.map((c) => c.trim());
+		const idm = cells[0] && cells[0].match(/F-\d+/);
+		if (!idm) continue; //  ヘッダ・区切り行を飛ばす
+		let link = null;
+		for (const c of cells) {
+			const lm = c.match(/\]\(([^)]+)\)/);
+			if (lm) {
+				link = lm[1];
+				break;
+			}
+		}
+		rows.push({
+			id: idm[0],
+			name: cells[1] || "",
+			status:
+				cells.find((c) => c === "draft" || c === "fixed") ||
+				cells[cells.length - 1],
+			link,
+		});
+	}
+	return rows;
 }
 
 //  --- validate コマンド ---
 function loadModel(docsDir) {
-	const specDir = join(docsDir, "spec");
-	const contractsDir = join(docsDir, "contracts");
-	const featuresFile = join(specDir, "features.md");
+	const specsRoot = join(docsDir, "specs");
+	const ledgerFile = join(specsRoot, "specs.md");
+	const fmt = deriveSpecFormat();
+	const xKeys = deriveContractKeys();
 
-	const specs = new Map(); //  id -> { file, status }
-	const contracts = new Map(); //  id -> { file, status, specLink }
-	let features = null;
+	const specs = new Map(); //  id -> { file, dir, status, inputs, statesText }
+	const contracts = new Map(); //  id -> { file, status, errorResponses }
+	let ledger = null;
 
-	for (const file of listMd(specDir)) {
-		if (basename(file) === "features.md") continue;
-		const res = validateFeatureSpec(file, readFileSync(file, "utf8"));
-		if (res.id) {
-			if (specs.has(res.id))
-				err(file, `機能ID "${res.id}" が重複（${specs.get(res.id).file} と）`);
-			else
-				specs.set(res.id, {
-					file,
-					status: res.status,
-					inputs: res.inputs,
-					statesText: res.statesText,
-				});
+	//  機能ディレクトリの走査（F-* のみ。specs.md / _shared は自然に対象外）
+	const dirs = readdirSync(specsRoot, { withFileTypes: true })
+		.filter((d) => d.isDirectory() && d.name.startsWith("F-"))
+		.map((d) => d.name)
+		.sort();
+
+	for (const dir of dirs) {
+		const dirPath = join(specsRoot, dir);
+		const dirId = (dir.match(/^F-\d+/) || [null])[0];
+		if (!DIR_RE.test(dir))
+			err(dirPath, `ディレクトリ名が F-xxx-<slug>（slug は小文字ケバブ）でない`);
+
+		const specFile = join(dirPath, "spec.md");
+		if (!existsSync(specFile)) {
+			err(dirPath, `spec.md が無い（機能ディレクトリには必須）`);
+			continue;
+		}
+		const res = validateFeatureSpec(specFile, readFileSync(specFile, "utf8"), fmt);
+		if (res.id && dirId && res.id !== dirId)
+			err(specFile, `機能ID "${res.id}" がディレクトリ名の ID "${dirId}" と不一致`);
+		const id = res.id || dirId;
+		if (id) {
+			if (specs.has(id))
+				err(specFile, `機能ID "${id}" が重複（${specs.get(id).file} と）`);
+			else specs.set(id, { file: specFile, dir, ...res });
+		}
+
+		const contractFile = join(dirPath, "api-contract.yaml");
+		if (existsSync(contractFile)) {
+			const c = validateContract(contractFile, readFileSync(contractFile, "utf8"), dirId, xKeys);
+			if (c.id) contracts.set(c.id, { file: contractFile, ...c });
 		}
 	}
 
-	for (const file of listMd(contractsDir)) {
-		const res = validateContract(file, readFileSync(file, "utf8"));
-		if (res.id)
-			contracts.set(res.id, {
-				file,
-				status: res.status,
-				specLink: res.specLink,
-				requestParams: res.requestParams,
-				errorRows: res.errorRows,
-			});
-	}
-
-	if (existsSync(featuresFile)) {
-		const { data, body } = parseFrontmatter(readFileSync(featuresFile, "utf8"));
-		checkRequiredFm(featuresFile, data, ["ステータス", "更新日"]);
-		checkStatus(featuresFile, data);
-		features = parseFeaturesTable(body);
-		if (features.length === 0) warn(featuresFile, "機能一覧テーブルに行が無い");
+	//  台帳
+	if (existsSync(ledgerFile)) {
+		const { data, body } = parseFrontmatter(readFileSync(ledgerFile, "utf8"));
+		checkRequiredFm(ledgerFile, data, ["ステータス", "更新日"]);
+		checkStatus(ledgerFile, data["ステータス"]);
+		ledger = parseLedgerTable(body);
+		if (ledger.length === 0) warn(ledgerFile, "機能一覧テーブルに行が無い");
 	} else {
-		warn(featuresFile, "機能一覧 features.md が無い（機能一覧の書式＝ssot-definer §A 参照）");
+		warn(ledgerFile, "台帳 specs.md が無い（テンプレート templates/develop/specs.md 参照）");
 	}
 
-	return { specs, contracts, features, specDir, featuresFile };
+	return { specs, contracts, ledger, specsRoot, ledgerFile };
 }
 
 function crossChecks(model) {
-	const { specs, contracts, features, specDir, featuresFile } = model;
+	const { specs, contracts, ledger, specsRoot, ledgerFile } = model;
 
-	//  features.md ↔ <feature>.md（状態一致・リンク整合・列挙漏れ）
-	if (features) {
+	//  台帳 ↔ spec.md（状態一致・リンク整合・列挙漏れ）
+	if (ledger) {
 		const listed = new Set();
-		for (const row of features) {
+		for (const row of ledger) {
 			listed.add(row.id);
 			const spec = specs.get(row.id);
 			if (!spec) {
-				err(featuresFile, `機能一覧の "${row.id}" に対応する spec が docs/spec に無い`);
+				err(ledgerFile, `台帳の "${row.id}" に対応する機能ディレクトリが docs/specs に無い`);
 				continue;
 			}
 			if (row.link) {
-				const target = join(specDir, row.link.replace(/^\.\//, ""));
+				const target = join(specsRoot, row.link.replace(/^\.\//, ""));
 				if (!existsSync(target))
-					err(featuresFile, `"${row.id}" の詳細リンクが解決しない: ${row.link}`);
+					err(ledgerFile, `"${row.id}" の詳細リンクが解決しない: ${row.link}`);
 			}
 			if (row.status !== spec.status)
 				err(
-					featuresFile,
-					`"${row.id}" の状態が不一致: features.md="${row.status}" / spec="${spec.status}"`,
+					ledgerFile,
+					`"${row.id}" の状態が不一致: specs.md="${row.status}" / spec="${spec.status}"`,
 				);
 		}
 		for (const [id, spec] of specs) {
-			if (!listed.has(id)) err(spec.file, `spec "${id}" が features.md に列挙されていない`);
+			if (!listed.has(id)) err(spec.file, `spec "${id}" が台帳 specs.md に列挙されていない`);
 		}
 	}
 
-	//  契約カバレッジ: spec が fixed（＝実装に進んでよい）なのに契約ファイルが
-	//  無い機能を可視化する。実装は契約 fixed を前提とするため、欠落を沈黙させない。
-	//  誤検知の余地（契約整備前の中間状態）があるため err でなく warn。
+	//  契約カバレッジ: spec が fixed（＝実装に進んでよい）なのに契約が無い機能を可視化
 	for (const [id, spec] of specs) {
 		if (spec.status === "fixed" && !contracts.has(id))
-			warn(spec.file, `${id}: spec が fixed だが契約ファイルが無い（docs/contracts に契約を作る）`);
+			warn(spec.file, `${id}: spec が fixed だが api-contract.yaml が無い`);
 	}
 
-	//  contract ↔ spec（親 draft に fixed 契約は不可・親の存在・入出力の相互整合）
+	//  contract ↔ spec（親 draft に fixed 契約は不可・入出力の相互整合）
 	for (const [id, c] of contracts) {
 		const spec = specs.get(id);
 		if (!spec) {
-			err(c.file, `契約 "${id}" に対応する spec が docs/spec に無い`);
+			err(c.file, `契約 "${id}" に対応する spec が無い`);
 			continue;
 		}
 		if (c.status === "fixed" && spec.status === "draft")
-			err(
-				c.file,
-				`親 spec が draft なのに契約が fixed（先に spec を fixed にする）: ${id}`,
-			);
+			err(c.file, `親 spec が draft なのに契約が fixed（先に spec を fixed にする）: ${id}`);
 		crossConsistency(id, spec, c);
 	}
 }
 
-//  構造整合オラクル相当（ヒューリスティック・warn 中心）:
-//  機能詳細の入力 ↔ 契約の Request、機能詳細の異常状態 ↔ 契約の異常 Response。
-//  名前は i_ 接頭辞を吸収して突き合わせる。名付けの揺れで誤検知しうるため warn。
+//  構造整合オラクル相当（ヒューリスティック・warn）:
+//  機能詳細の入力名が契約本文に現れるか／異常状態に異常レスポンスが対応するか。
 function crossConsistency(id, spec, c) {
-	const specIn = new Set(spec.inputs.map(normName));
-	const reqIn = new Set(c.requestParams.map(normName));
-
-	for (const n of specIn)
-		if (!reqIn.has(n))
-			warn(c.file, `${id}: 機能詳細の入力 "${n}" が契約 Request に見当たらない`);
-	for (const n of reqIn)
-		if (!specIn.has(n))
-			warn(c.file, `${id}: 契約 Request の "${n}" が機能詳細の入力に見当たらない`);
-
-	//  機能詳細が error/権限/境界 の異常状態を持つのに、契約の異常 Response が空
+	const contractText = readFileSync(c.file, "utf8").toLowerCase();
+	for (const raw of spec.inputs) {
+		const n = normName(raw);
+		if (!n) continue;
+		if (!contractText.includes(n))
+			warn(c.file, `${id}: 機能詳細の入力 "${raw}" が契約に見当たらない`);
+	}
 	const hasAbnormalState = /error|権限|境界/.test(spec.statesText);
-	if (hasAbnormalState && c.errorRows === 0)
-		warn(
-			c.file,
-			`${id}: 機能詳細に異常状態があるが契約の「Response（異常）」に行が無い`,
-		);
+	if (hasAbnormalState && c.errorResponses === 0)
+		warn(c.file, `${id}: 機能詳細に異常状態があるが契約に 4xx/5xx レスポンスが無い`);
 }
 
 function cmdValidate(docsDir) {
-	if (!existsSync(join(docsDir, "spec"))) {
-		console.log(`spec-lint: ${docsDir}/spec が無いため検証をスキップ`);
+	if (!existsSync(join(docsDir, "specs"))) {
+		if (existsSync(join(docsDir, "spec"))) {
+			console.error(
+				`spec-lint: 旧レイアウト（${docsDir}/spec + ${docsDir}/contracts）を検出。` +
+					`新レイアウト（${docsDir}/specs/F-xxx-<slug>/）へ移行するか、移行までは旧タグの harness を使う`,
+			);
+			return 1;
+		}
+		console.log(`spec-lint: ${docsDir}/specs が無いため検証をスキップ`);
 		return 0;
 	}
+	validateRootDoc(join(docsDir, "PRD.md"), "prd");
+	validateRootDoc(join(docsDir, "design.md"), "design");
 	const model = loadModel(docsDir);
 	crossChecks(model);
 	report();
@@ -444,35 +513,29 @@ function cmdValidate(docsDir) {
 }
 
 //  --- gate コマンド（draft なのに実装、を防ぐ） ---
-function statusOf(docsDir, id) {
-	const spec = existsSync(join(docsDir, "spec"))
-		? listMd(join(docsDir, "spec")).find((f) => {
-				if (basename(f) === "features.md") return false;
-				return parseFrontmatter(readFileSync(f, "utf8")).data["機能ID"] === id;
-			})
-		: null;
-	const contract = existsSync(join(docsDir, "contracts"))
-		? listMd(join(docsDir, "contracts")).find(
-				(f) => parseFrontmatter(readFileSync(f, "utf8")).data["機能ID"] === id,
-			)
-		: null;
-	const st = (f) => (f ? parseFrontmatter(readFileSync(f, "utf8")).data["ステータス"] : null);
-	return { spec: st(spec), contract: st(contract), specFound: !!spec, contractFound: !!contract };
+function featureDir(docsDir, id) {
+	const specsRoot = join(docsDir, "specs");
+	if (!existsSync(specsRoot)) return null;
+	const hit = readdirSync(specsRoot, { withFileTypes: true }).find(
+		(d) => d.isDirectory() && (d.name === id || d.name.startsWith(id + "-")),
+	);
+	return hit ? join(specsRoot, hit.name) : null;
 }
 
 function gateFeature(docsDir, id) {
-	const s = statusOf(docsDir, id);
-	if (!s.specFound) {
-		err("gate", `${id}: 対応する spec が無い（docs/spec に機能詳細を作る）`);
+	const dir = featureDir(docsDir, id);
+	if (!dir || !existsSync(join(dir, "spec.md"))) {
+		err("gate", `${id}: 対応する spec が無い（docs/specs/${id}-<slug>/spec.md を作る）`);
 		return;
 	}
-	if (s.spec !== "fixed")
+	const spec = parseFrontmatter(readFileSync(join(dir, "spec.md"), "utf8")).data;
+	if (spec["ステータス"] !== "fixed")
 		err("gate", `${id}: spec が fixed でない（draft のまま実装しない）`);
-	//  契約は「存在し、かつ fixed」を要求する。契約ファイルの欠落を
-	//  実装ゲートで素通りさせない（契約なしのまま実装が進む事故を断つ）。
-	if (!s.contractFound)
-		err("gate", `${id}: 契約が無い（docs/contracts に契約を作り fixed にする）`);
-	else if (s.contract !== "fixed")
+	//  契約は「存在し、かつ fixed」を要求する（契約なしのまま実装が進む事故を断つ）
+	const contractFile = join(dir, "api-contract.yaml");
+	if (!existsSync(contractFile))
+		err("gate", `${id}: 契約が無い（${basename(dir)}/api-contract.yaml を作り fixed にする）`);
+	else if (topLevelYamlKeys(readFileSync(contractFile, "utf8"))["x-status"] !== "fixed")
 		err("gate", `${id}: 契約が fixed でない（draft のまま実装しない）`);
 }
 

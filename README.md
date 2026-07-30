@@ -116,15 +116,21 @@ claude-harness/
       │    │  ※ skill は必ず skills/<name>/SKILL.md の1階層に置く（Claude Code はこの階層しか探索しない）
       │    ├── develop/SKILL.md                    # 🎼 開発の指揮者（orchestrator）。核・台本を内包。入口 /develop
       │    ├── translate-manga-ko-ja/SKILL.md      # 🈯 翻訳の指揮者（orchestrator）。maker/judge を起動。入口 /translate-manga-ko-ja
-      │    └── grilling/SKILL.md                   # 計画・設計を詰めるインタビュー
+      │    ├── grilling/SKILL.md                   # 計画・設計を詰めるインタビュー
+      │    └── docs-migrate/SKILL.md               # 🔧 docs の現行レイアウト準拠検査＋移行。入口 /docs-migrate
+      │                                            #   （準拠の定義は持たない＝spec-lint とテンプレートを正として回すだけ）
+      │
+      ├── templates/                        # 📄 docs 成果物のテンプレート（書式の SSOT）
+      │    └── develop/                            # PRD / design / specs 台帳 / spec / api-contract(OpenAPI) / _shared
+      │                                            #   producer が雛形に使い、spec-lint が必須項目を導出する（書式改定は1箇所）
       │
       └── tools/                            # 🔧 実行アセット（バリデータ・生成器）
            ├── spec-lint/                         # docs SSOT 検証（producer が直接叩く）
-           ├── gate-hook/                          # §1.5 実装着手ゲートの機械強制（PreToolUse フック・任意有効化）
+           ├── gate-hook/                          # develop skill §2 実装着手ゲートの機械強制（PreToolUse フック・任意有効化）
            └── cursor-sync/                        # .claude の3木(rules/skills/agents) → Cursor の .cursor/ へ射影
 ```
 
-> 💡 **harness が同梱する機械チェックは「検証ツール」まで**（`tools/spec-lint`＝docs SSOT 検証、`tools/gate-hook`＝§1.5 の書き込み時停止線）。spec-lint は producer がタスク中に直接叩く。
+> 💡 **harness が同梱する機械チェックは「検証ツール」まで**（`tools/spec-lint`＝docs SSOT 検証、`tools/gate-hook`＝develop skill §2 の書き込み時停止線）。spec-lint は producer がタスク中に直接叩く。
 > **フック / CI への配線・ブランチ保護といった「設置」は各プロジェクトの責務**（gate-hook もスクリプト＋手順の同梱までで、settings への配線＝有効化は取り込み先の任意。かつて `enforcer` エージェント＋`conventions/enforcement/` が担った常設の強制は撤去済み）。durable な知識は agent body / rules に畳み、実行アセットは `.claude/tools/` に置く。
 
 ## 🧱 手続きの3木（skills / agents / rules を同じキーで揃える）

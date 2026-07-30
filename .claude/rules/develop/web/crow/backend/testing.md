@@ -21,6 +21,8 @@ paths:
 - **ファイル名の探索規則を `phpunit.xml` に明示する。** PHPUnit の既定は `*Test.php` サフィックスなので、
   crow の snake_case 命名（`check_value_test.php`）のままだと**1 件も発見されない**。
   `<testsuite>` の `<directory suffix="_test.php">` を設定する
+- **機能ID タグ**（共通則の「スコープ実行」）: テストクラスに `#[Group('F-001')]`
+  （PHPUnit 9 以前は `@group F-001`）を付ける。指定実行は `phpunit --group F-001`
 
 ## テストの構造（AAA ＝ Given-When-Then）
 

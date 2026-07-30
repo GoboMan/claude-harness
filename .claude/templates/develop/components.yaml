@@ -1,0 +1,22 @@
+# docs/specs/_shared/components.yaml — 契約の共有語彙（$ref 先）
+# 入れてよいもの: 2 機能以上で使うものだけ（エラー形・エラーコード・認証方式・共有 DTO）
+# 1 機能でしか使わない schema は各契約にインラインで書く（ここに入れない）
+# 書き込みは orchestrator のみ。並行 producer は追記せず「追加したい語彙」を報告で返す
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: session
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        message:
+          type: string
+    ErrorCode:
+      type: string
+      enum: [INVALID_INPUT, FORBIDDEN, NOT_FOUND]
