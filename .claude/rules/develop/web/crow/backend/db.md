@@ -8,7 +8,7 @@ paths:
 > crow における **DB 設計の唯一の SSOT** は、独自形式のテキストファイル `db_design.txt`。
 > crow はこのファイルから**直接マイグレーションを自動生成する**（TypeScript の Prisma における `schema.prisma` に相当）。
 > したがって develop の DB 設計成果物（`db-designer` の出力）は、**この `db_design.txt` そのもの**に書く。
-> 手続きは develop skill の §4（docs 成果物の住所）・§6（framework 規約の受け渡し）が土台。
+> 手続きは develop skill の §3（docs 成果物の住所）・§6（framework 規約の受け渡し）が土台。
 
 ## 住所（どこに書くか）
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-//  gate-hook — §1.5 実装着手ゲートの機械強制（PreToolUse フック）
+//  gate-hook — §2 実装着手ゲートの機械強制（PreToolUse フック）
 //
-//  develop skill §1.5 は「spec と契約が fixed になる前に実装コードを書くな」という
+//  develop skill §2 は「spec と契約が fixed になる前に実装コードを書くな」という
 //  停止線だが、それ自体は説得的制御（AI が読み飛ばせば止まらない）。spec-lint の
 //  gate も commit 時にしか発火しない事後チェックである。本フックはその停止線を
 //  Write / Edit の直前で発火する構造的強制に変える。
@@ -9,7 +9,7 @@
 //  仕組み:
 //    Claude Code の PreToolUse フックとして起動され、stdin の JSON から書き込み
 //    対象パスを取り出す。対象が「実装コード」（--code glob にマッチ）なら、
-//    docs/spec/features.md の台帳（工程列）を読み、実装中（工程=実装|攻撃）の
+//    docs/specs/specs.md の台帳（工程列）を読み、実装中（工程=実装|攻撃）の
 //    全機能について spec / 契約の fixed を検証する。欠けていれば exit 2 で
 //    ツール実行そのものをブロックし、stderr の理由が AI に差し戻される。
 //
@@ -17,11 +17,11 @@
 //    - docs 配下・.claude 配下・--code 非マッチ・--exclude マッチ → 許可（exit 0）。
 //      SSOT を書く行為はゲートの前提なので docs は常に通す。
 //    - 実装コードへの書き込みで、
-//        features.md が無い / 工程=実装|攻撃 の行が無い /
+//        specs.md（台帳）が無い / 工程=実装|攻撃 の行が無い /
 //        該当機能の spec が fixed でない / 契約が無い・fixed でない
 //      → ブロック（exit 2）。ここは fail-closed（ゲートの存在意義）。
 //    - stdin が解釈できない等の内部エラー → 許可（exit 0）。フック自身の不具合で
-//      セッションを壊さない（ゲートは spec-lint gate と §1.5 自己確認が二重に守る）。
+//      セッションを壊さない（ゲートは spec-lint gate と §2 自己確認が二重に守る）。
 //
 //  設定はフックコマンドの引数で渡す（設定ファイルを増やさない。submodule 配置でも
 //  取り込み先の settings.local.json に閉じる）:
@@ -109,15 +109,28 @@ function parseLedger(body) {
 	return rows;
 }
 
-function findDocByFeatureId(dir, id) {
-	if (!existsSync(dir)) return null;
-	for (const f of readdirSync(dir)) {
-		if (!f.endsWith(".md")) continue;
-		const p = join(dir, f);
-		const fm = parseFrontmatter(readFileSync(p, "utf8"));
-		if (fm["機能ID"] === id) return { path: p, status: fm["ステータス"] || null };
+//  機能ディレクトリ（docs/specs/F-xxx-<slug>/）をディレクトリ名の ID 部で解決する
+function findFeatureDir(specsRoot, id) {
+	if (!existsSync(specsRoot)) return null;
+	for (const f of readdirSync(specsRoot, { withFileTypes: true })) {
+		if (f.isDirectory() && (f.name === id || f.name.startsWith(id + "-")))
+			return join(specsRoot, f.name);
 	}
 	return null;
+}
+
+function specStatus(dir) {
+	const p = join(dir, "spec.md");
+	if (!existsSync(p)) return null;
+	return { status: parseFrontmatter(readFileSync(p, "utf8"))["ステータス"] || null };
+}
+
+//  契約（OpenAPI yaml）の x-status をトップレベル行スキャンで読む
+function contractStatus(dir) {
+	const p = join(dir, "api-contract.yaml");
+	if (!existsSync(p)) return null;
+	const m = readFileSync(p, "utf8").match(/^x-status:\s*([\w-]+)/m);
+	return { status: m ? m[1] : null };
 }
 
 //  ---- 本体 ----------------------------------------------------------------
@@ -126,9 +139,9 @@ function block(lines) {
 	//  exit 2: PreToolUse のブロック。stderr がそのまま AI に差し戻される。
 	process.stderr.write(
 		[
-			"[gate-hook] 実装着手ゲート（develop skill §1.5）によりこの書き込みをブロックしました。",
+			"[gate-hook] 実装着手ゲート（develop skill §2）によりこの書き込みをブロックしました。",
 			...lines,
-			"コードでなく SSOT を先に整えること（§1.5 の分岐表に従い Phase 1 / Phase 3 へ）。",
+			"コードでなく SSOT を先に整えること（§2 の分岐表に従い Phase 1 / Phase 3 へ）。",
 		].join("\n") + "\n",
 	);
 	process.exit(2);
@@ -169,33 +182,36 @@ function main() {
 	if (matchesAny(rel, opts.exclude)) process.exit(0);
 	if (!matchesAny(rel, opts.code)) process.exit(0);
 
-	//  ---- ここから実装コードへの書き込み: 台帳で §1.5 を検証（fail-closed） ----
+	//  ---- ここから実装コードへの書き込み: 台帳で §2 を検証（fail-closed） ----
 
-	const featuresFile = join(root, docsDir, "spec", "features.md");
-	if (!existsSync(featuresFile))
+	const specsRoot = join(root, docsDir, "specs");
+	const ledgerFile = join(specsRoot, "specs.md");
+	if (!existsSync(ledgerFile))
 		block([
 			`対象: ${rel}`,
-			`${docsDir}/spec/features.md が存在しない＝SSOT が無い。§1.5 判定条件 1 を満たせません。`,
+			`${docsDir}/specs/specs.md（台帳）が存在しない＝SSOT が無い。§2 判定条件 1 を満たせません。`,
 		]);
 
-	const ledger = parseLedger(readFileSync(featuresFile, "utf8"));
+	const ledger = parseLedger(readFileSync(ledgerFile, "utf8"));
 	const active = ledger.filter((r) => r.stage === "実装" || r.stage === "攻撃");
 	if (active.length === 0)
 		block([
 			`対象: ${rel}`,
-			`features.md の台帳に 工程=実装（または 攻撃）の機能がありません。`,
+			`specs.md の台帳に 工程=実装（または 攻撃）の機能がありません。`,
 			"実装に入る機能の spec / 契約を fixed にしたうえで、orchestrator が台帳の工程列を「実装」へ更新してから書くこと。",
 		]);
 
 	const problems = [];
 	for (const r of active) {
-		const spec = findDocByFeatureId(join(root, docsDir, "spec"), r.id);
-		if (!spec) problems.push(`${r.id}: spec（${docsDir}/spec/）が存在しない → Phase 1`);
+		const dir = findFeatureDir(specsRoot, r.id);
+		const spec = dir ? specStatus(dir) : null;
+		if (!spec)
+			problems.push(`${r.id}: spec（${docsDir}/specs/${r.id}-<slug>/spec.md）が存在しない → Phase 1`);
 		else if (spec.status !== "fixed")
 			problems.push(`${r.id}: spec が fixed でない（現在 ${spec.status ?? "不明"}）→ Phase 1`);
-		const contract = findDocByFeatureId(join(root, docsDir, "contracts"), r.id);
+		const contract = dir ? contractStatus(dir) : null;
 		if (!contract)
-			problems.push(`${r.id}: 契約（${docsDir}/contracts/）が存在しない → Phase 3`);
+			problems.push(`${r.id}: 契約（同ディレクトリの api-contract.yaml）が存在しない → Phase 3`);
 		else if (contract.status !== "fixed")
 			problems.push(
 				`${r.id}: 契約が fixed でない（現在 ${contract.status ?? "不明"}）→ Phase 3（fixed 化は structure-oracle 不整合ゼロ後に orchestrator が行う）`,
