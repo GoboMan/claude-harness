@@ -16,7 +16,8 @@ paths:
 ## ツールと配置
 
 - テストランナーは **PHPUnit**。設定は `phpunit.xml`（または `phpunit.xml.dist`）に集約する
-- テストは `tests/` 配下に置き、**対象コードのディレクトリ構成をミラー**する
+- **既定スイート**は `tests/` 配下に置き、**対象コードのディレクトリ構成をミラー**する
+- **結合スイート**（実 DB・実サービスに接続するもの）は `tests/integration/` へ分ける（§スイートの分離）
 - 1 テスト対象（クラス／関数）につき **1 テストクラス**。ファイル名＝クラス名
 - **ファイル名の探索規則を `phpunit.xml` に明示する。** PHPUnit の既定は `*Test.php` サフィックスなので、
   crow の snake_case 命名（`check_value_test.php`）のままだと**1 件も発見されない**。
@@ -128,7 +129,36 @@ public function test_returns_empty_list_when_no_row_matches()
 }
 ```
 
-外部サービスに実接続する結合テストは、単体テストと**別のスイート**に分ける（`@group integration` 等）。
+---
+
+## スイートの分離（`phpunit.xml` で住所ごとに切る）
+
+実 DB・実サービスに接続するテストは、共通則の
+[「スイートは実行に何を要求するかで分ける」](../common/testing.md)に従って**フォルダで**分ける。
+**`@group integration` のようなタグで分けない。** タグ方式は既定スイートの実行コマンドが
+`--exclude-group` を落とした瞬間に混入し、しかもその混入が緑のまま気づけない。
+
+PHPUnit の既定探索は `tests` 配下を再帰的に拾うので、**`<exclude>` を書かないと結合テストが既定スイートに混ざる**。
+
+```xml
+<testsuites>
+    <testsuite name="default">
+        <directory suffix="_test.php">tests</directory>
+        <exclude>tests/integration</exclude>
+    </testsuite>
+    <testsuite name="integration">
+        <directory suffix="_test.php">tests/integration</directory>
+    </testsuite>
+</testsuites>
+```
+
+| スイート | 実行 | いつ回すか |
+| --- | --- | --- |
+| 既定 | `phpunit --testsuite default` | 赤緑ループで毎回。**DB が無いマシンでも緑になること** |
+| 結合 | `phpunit --testsuite integration` | 境界（返す直前・commit 前・CI）のみ |
+
+`tests/` 直下（既定スイート）では、DB ハンドル等の境界を上記「crow の境界を差し替える」のとおり**必ずモックする**。
+実接続したくなったら、それは `tests/integration/` へ置くべきテストである。
 
 ---
 
@@ -136,6 +166,8 @@ public function test_returns_empty_list_when_no_row_matches()
 
 - [ ] 対象の GWT 受け入れ条件（orchestrator が渡す）を先に確認したか
 - [ ] `phpunit.xml` のファイル探索サフィックスが crow の命名と一致しているか
+- [ ] 書こうとしているテストは実 DB・実サービスに繋ぐか（繋ぐなら `tests/integration/`、繋がないなら `tests/` 直下）
+- [ ] `phpunit.xml` の既定スイートが `tests/integration` を `<exclude>` しているか
 - [ ] `assertSame` / `assertTrue|False` / `assertNull` で strict に検証しているか（`!` を使っていないか）
 - [ ] 入力バリエーションをデータプロバイダにまとめ、ケース名を付けたか
 - [ ] スーパーグローバル・静的状態を元に戻しているか
