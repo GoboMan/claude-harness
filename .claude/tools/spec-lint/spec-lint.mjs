@@ -83,12 +83,17 @@ const sectionFilled = (sec) => sec.lines.some((l) => l.trim().length > 0);
 const findSection = (body, test) => getSections(body).find((s) => test(s.title));
 
 //  マークダウン表の1列目（＝名前列）を拾う。ヘッダ行・区切り行は位置で除外。
+//  入力セクションは表が複数並ぶことが多いので、表が切れたらヘッダ判定をリセットする
+//  （リセットしないと2つ目以降のヘッダ行「名前」が入力名として誤検知される）。
 function tableFirstColumn(lines) {
 	const names = [];
 	let seenHeader = false;
 	for (const line of lines) {
 		const t = line.trim();
-		if (!t.startsWith("|")) continue;
+		if (!t.startsWith("|")) {
+			seenHeader = false;
+			continue;
+		}
 		const cells = t
 			.split("|")
 			.slice(1, -1)
@@ -96,7 +101,7 @@ function tableFirstColumn(lines) {
 		const first = cells[0] || "";
 		if (/^:?-{2,}:?$/.test(first)) continue; //  区切り行
 		if (!seenHeader) {
-			seenHeader = true; //  最初の非区切り行＝ヘッダ
+			seenHeader = true; //  その表の最初の非区切り行＝ヘッダ
 			continue;
 		}
 		if (!first) continue;
