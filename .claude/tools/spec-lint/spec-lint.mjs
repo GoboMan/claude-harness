@@ -325,8 +325,10 @@ function validateContract(file, text, dirId, xKeys) {
 	if (status === "fixed" && !/^\s+examples?:/m.test(text))
 		warn(file, `fixed なのに examples が無い（正常 1 件＋異常 1 件以上の実値を書く）`);
 
-	//  異常系レスポンスの行数相当（4xx/5xx キーの検出）
-	const errorResponses = (text.match(/^\s+["']?[45]\d\d["']?:/gm) || []).length;
+	//  異常系レスポンスの行数相当（3xx/4xx/5xx キーの検出）
+	//  crow はページ GET の未ログインを 302（auth へ）で返すことが多い。
+	//  異常応答の有無は 3xx/4xx/5xx を数える（2xx のみの契約を摘発する）。
+	const errorResponses = (text.match(/^\s+["']?[345]\d\d["']?:/gm) || []).length;
 	return { id, status, errorResponses };
 }
 
@@ -494,7 +496,7 @@ function crossConsistency(id, spec, c) {
 	}
 	const hasAbnormalState = /error|権限|境界/.test(spec.statesText);
 	if (hasAbnormalState && c.errorResponses === 0)
-		warn(c.file, `${id}: 機能詳細に異常状態があるが契約に 4xx/5xx レスポンスが無い`);
+		warn(c.file, `${id}: 機能詳細に異常状態があるが契約に 3xx/4xx/5xx レスポンスが無い`);
 }
 
 function cmdValidate(docsDir) {
