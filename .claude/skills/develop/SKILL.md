@@ -135,8 +135,8 @@ Phase3 で固定した契約を土台に、frontend と backend を別コンテ�
 - **4a-1 見た目** (`frontend-ui-implementer`, 🙋): 契約 response 形に沿うビュー層。データは契約通りにモック。**ロジックは書かない。**
 - **4a-2 frontend 処理** (`frontend-logic-implementer`, 🤖): 契約に沿うリクエスト処理・状態・純粋関数を Red→Green→Refactor で作り、見た目に配線。
 - **4b backend** (`backend-logic-implementer`, 🤖): 契約に沿うバックエンド処理を Red→Green→Refactor。4a と並行。
-- **結合（専任工程なし）**: frontend-logic の API クライアントは契約準拠の実物（モックは FE ロジックテスト専用）。**両者が契約を守れば食い違わない**ので、結合のための専任工程は置かない。残る結合欠陥は `slice-attacker` の探索に委ねる。
-  > **E2E は develop の工程に置かない（一旦）。** ブラウザ駆動・実環境起動を伴う E2E は、環境構築コストが着手のブロッカーになりやすいわりに、両側の契約適合が機械オラクルで回っている限り二重の保険にしかならない。必要になったプロジェクトが独自に足す。**この判断ゆえに、契約適合テストは FE／BE 双方で必須**であり、ここを緩めると結合欠陥の検出手段が無くなる。
+- **結合（専任工程なし）**: frontend-logic の契約の縁（HTTP API クライアント、Server Actions 呼び出し境界など。**framework の形に従う**）は契約準拠の実物とし、モックは FE ロジックテスト専用。**両者が契約を守れば食い違わない**ので、結合のための専任工程は置かない。残る結合欠陥は `slice-attacker` の探索に委ねる。
+  > **E2E は develop の工程に置かない（一旦）。** ブラウザ駆動・実環境起動を伴う E2E は、環境構築コストが着手のブロッカーになりやすいわりに、両側の契約適合が機械オラクルで回っている限り二重の保険にしかならない。必要になったプロジェクトが独自に足す。**この判断ゆえに、契約適合テストは FE／BE 双方で必須**であり、ここを緩めると結合欠陥の検出手段が無くなる。**「何が契約の縁か」は framework の `testing.md` が定める**（例: 伝統的 API クライアントが無い構成でも、FE は更新口の呼び出し・写像、BE はその入口の縁を対象にする）。
 - **テストスイートは「実行に何を要求するか」でフォルダを分ける。** 外部環境を一切起動しないもの（＝既定スイート）だけが本フェーズの赤緑ループの対象で、実 DB・実サービス接続（結合）とブラウザ・実機起動（システム）は別フォルダ・別コマンドへ出し、境界（返す直前・commit 前・CI）または工程外で回す。**契約適合テストは名前に反して既定スイート**（外部環境を起動しないため）——ここを結合側へ出すと上記の担保が赤緑ループから外れる。住所・実行コマンドは framework の `testing.md` 葉が定める。
 - **起動順**:
   1. `test-designer` を UI表示／frontend処理／backend処理のトラック別に **3 並行**起動（実装を見て書かせない）
@@ -291,21 +291,22 @@ spec／contract は**現在形の不変条件だけ**を持ち、経緯・理由
 | `coding.md` | 該当レイヤの**実装体** ＋ 該当トラックの **test-designer** |
 | `testing.md` | 該当トラックの **test-designer** のみ |
 | `db.md` | **db-designer** のみ |
-| 上記以外 | 該当レイヤの**実装体**のみ |
+| 上記以外 | 該当レイヤの**実装体** ＋ 該当トラックの **test-designer** |
 
 `common/` 配下の葉は「該当レイヤ」の条件を外し、上表の渡し先すべてに渡す。
 
 | 渡し先 | 束 |
 | --- | --- |
-| 実装体（`frontend-ui`／`frontend-logic`） | `common/coding.md` ＋ `frontend/` の **`testing.md` 以外の全葉** |
+| 実装体（`frontend-ui`／`frontend-logic`） | `common/coding.md` ＋ `frontend/` の **`testing.md` 以外の全葉**。加えて、自レイヤの葉が**他レイヤの `coding.md` へ実装を委任**している場合はその参照先も含める |
 | 実装体（`backend-logic`） | `common/coding.md` ＋ `backend/` の **`testing.md`・`db.md` 以外の全葉** |
-| `test-designer`（UI／FE トラック） | `common/coding.md` ＋ `common/testing.md` ＋ `frontend/coding.md` ＋ `frontend/testing.md` |
+| `test-designer`（UI／FE トラック） | `common/coding.md` ＋ `common/testing.md` ＋ `frontend/` の**全葉**（`testing.md` 含む）。実装体と同様、**他レイヤ `coding.md` への委任があればその参照先も含める** |
 | `test-designer`（BE トラック） | `common/coding.md` ＋ `common/testing.md` ＋ `backend/coding.md` ＋ `backend/testing.md` |
 | `db-designer` | `db.md`（レイヤ分けがあればそのレイヤ配下） |
 
 - **束は分割して渡さない。** 同一レイヤに実装体が複数いる場合（UI とロジック）、両方に同じ束を渡す。
+- **レイヤ横断の委任:** 自レイヤの葉が「○○の本体は他レイヤの `coding.md`」と書くとき、当該レイヤの**実装体と test-designer**の束にその参照先を含める。framework 名は問わない。委任が無い案件では何も足さない。
 - DB 設計のネイティブ書式・住所は db-designer に渡す（§3 docs 住所表）。
-- 新しい規約葉を作るときは `coding.md`／`testing.md`／`db.md` の名前の意味を守る（詳細はリポジトリの `CLAUDE.md` §3.1）。
+- 新しい規約葉を作るときは `coding.md`／`testing.md`／`db.md` の名前の意味を守る（詳細はリポジトリの `CLAUDE.md` §3.1）。**束の組成・横断委任の正本は本節（§6-B）**である。
 
 ## 7. 最終完了条件
 

@@ -32,6 +32,7 @@ AI（特に Claude）の**ベースライン・コンテキストをゼロに保
 ```text
 ① paths ゲート … 各葉の frontmatter `paths:` にマッチするファイルを触ると、その葉だけ注入
    例) crow3_* 配下を触る          → web/crow/{common,frontend,backend}/*.md が載る
+       next.config / app/**/page.tsx 等 → web/next/{common,frontend,backend}/*.md が載る
        *.tsx / *.ts を触る          → native/expo/{common,frontend}/*.md が載る
 
 ② skill エントリ … 手続きは skill として description 自動起動 or /name 明示起動
@@ -67,20 +68,33 @@ claude-harness/
       ├── rules/                           # 📦 葉のみ。目次(index.md)は持たない
       │    ├── develop/                    #   🎬 シーン: システム開発（旧 engineering）※判断核・台本は develop skill 内
       │    │    ├── web/                   #     🖥️ プラットフォーム: Web（builder 規約）
-      │    │    │    └── crow/             #       📦 framework: crow（PHP独自FW）
+      │    │    │    ├── crow/             #       📦 framework: crow（PHP独自FW）
+      │    │    │    │    ├── common/      #         🔗 全レイヤ共通
+      │    │    │    │    │    ├── coding.md #          コーディング規約（共通スタイル）
+      │    │    │    │    │    └── testing.md #         テストの共通則
+      │    │    │    │    ├── frontend/    #         🎨 表面（HTML/CSS/JS）
+      │    │    │    │    │    ├── coding.md #          共通への上乗せ
+      │    │    │    │    │    ├── viewpart.md #        ビューパーツの構造規約
+      │    │    │    │    │    ├── viewpart-dataflow.md # 状態と単一方向フロー
+      │    │    │    │    │    ├── viewpart-components.md # 粒度と再利用（ui/parts/feature）
+      │    │    │    │    │    └── testing.md #         テスト設計（外部ランナー）
+      │    │    │    │    └── backend/     #         ⚙️ サーバ側（PHP）
+      │    │    │    │         ├── coding.md #          共通への上乗せ
+      │    │    │    │         ├── testing.md #         テスト設計（PHPUnit）
+      │    │    │    │         └── db.md    #          DB 設計の書式・住所（db_design.txt）
+      │    │    │    └── next/             #       📦 framework: Next.js（App Router）
       │    │    │         ├── common/      #         🔗 全レイヤ共通
-      │    │    │         │    ├── coding.md #          コーディング規約（共通スタイル）
-      │    │    │         │    └── testing.md #         テストの共通則
-      │    │    │         ├── frontend/    #         🎨 表面（HTML/CSS/JS）
-      │    │    │         │    ├── coding.md #          共通への上乗せ
-      │    │    │         │    ├── viewpart.md #        ビューパーツの構造規約
-      │    │    │         │    ├── viewpart-dataflow.md # 状態と単一方向フロー
-      │    │    │         │    ├── viewpart-components.md # 粒度と再利用（ui/parts/feature）
-      │    │    │         │    └── testing.md #         テスト設計（外部ランナー）
-      │    │    │         └── backend/     #         ⚙️ サーバ側（PHP）
-      │    │    │              ├── coding.md #          共通への上乗せ
-      │    │    │              ├── testing.md #         テスト設計（PHPUnit）
-      │    │    │              └── db.md    #          DB 設計の書式・住所（db_design.txt）
+      │    │    │         │    ├── coding.md #          TS の共通則・export・秘密
+      │    │    │         │    └── testing.md #         ランナー契約・スイート分離・F-xxx
+      │    │    │         ├── frontend/    #         🎨 RSC / Client 境界
+      │    │    │         │    ├── coding.md #          Server 既定・page は配線
+      │    │    │         │    ├── dataflow.md #        一方向データフロー・状態の置き場
+      │    │    │         │    ├── components.md #      粒度と UI/ロジック実装体の分担
+      │    │    │         │    ├── routing.md #         App Router の住所と URL 前提
+      │    │    │         │    └── testing.md #         props 状態の UI 試験・スナップショット禁止
+      │    │    │         └── backend/     #         ⚙️ サーバ側責務分離
+      │    │    │              ├── coding.md #          4 役割・Actions / 縁の検証
+      │    │    │              └── testing.md #         ドメイン優先・境界モック・縁は薄く
       │    │    ├── native/                #     📱 プラットフォーム: モバイルネイティブ
       │    │    │    └── expo/             #       📦 framework: Expo（expo-router / React Native）
       │    │    │         ├── common/      #         🔗 全レイヤ共通

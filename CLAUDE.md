@@ -58,9 +58,10 @@
 | `coding.md` | プロダクションコードの記法 → 実装体 ＋ test-designer |
 | `testing.md` | テストの書き方 → test-designer のみ |
 | `db.md` | DB 設計の住所・書式 → db-designer のみ |
-| 上記以外の任意の名前 | その他の関心事 → 実装体のみ |
+| 上記以外の任意の名前 | その他の関心事 → 実装体 ＋ 該当トラックの test-designer |
 
 `common/` に置いた葉は、レイヤ条件を外して上記の全宛先へ配られる。
+**束の組成・レイヤ横断の委任（他レイヤ `coding.md` をいつ渡すか）の正本は** develop skill §6-B。本表はファイル名の予約語だけを定める。
 2. frontmatter に `paths:`（発火 glob）を必ず書く。
 3. **1 葉 = 1 関心事**（coding / testing / db …）。overview は入口リンクだけ。
 4. 目次への追記は不要（存在しない）。
