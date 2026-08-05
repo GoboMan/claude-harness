@@ -28,6 +28,8 @@
 | 作る ≠ 判定する | producer と oracle/attacker/judge は別 agent・別コンテキスト |
 | skill = 回し方 | orchestrator の判断核・台本のみ。型は rules／templates、craft は agent body |
 
+**orchestrator 変種の例外:** 台本だけ薄い別入口（例: `skills/develop-light`）は、agents / rules を親キー（`develop`）と共用してよく、フル3木を新設しない。craft・規約の二重化を避ける。
+
 ---
 
 ## 2. 何をどこに置くか（迷い用の早見）
@@ -80,6 +82,8 @@ paths:
 3. `agents/<key>/*.md` … producer / oracle を分離。書式リファレンスは生成する agent body に内包。
 4. `rules/<key>/**` … paths ゲートで遅延ロードする型。
 5. skill 本文から agent パスを相対で指す（絶対パスや他プロジェクト前提を書かない）。
+
+**orchestrator 変種だけ足す場合**（例: `develop-light`）: 新しい agents / rules ツリーは作らず、親キーの agents を Task から参照する薄い `skills/<variant>/SKILL.md` だけを足す。親 skill へ交差参照を置き、ゲート免除の逃げ道にしない。
 
 ### 3.3 agent frontmatter の型
 

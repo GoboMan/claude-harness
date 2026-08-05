@@ -110,10 +110,10 @@ claude-harness/
       │    └── translate-manga-ko-ja/       #   🈯 翻訳の型（overview/register/consistency/master-format/script-format）
       │
       ├── agents/                           # 🤖 サブエージェント（key 別に集約）
-      │    ├── develop/                      #   開発（/develop の orchestrator が Task 起動）
+      │    ├── develop/                      #   開発（/develop・/develop-light の orchestrator が Task 起動）
       │    │    ├── ssot-definer.md                # Phase1 機能一覧・詳細（人間ゲート）
       │    │    ├── db-designer.md, contract-author.md  # Phase3 構造（DB＝人間ゲート／契約＝機械）
-      │    │    ├── structure-oracle.md            # 構造整合の独立判定
+      │    │    ├── structure-oracle.md            # 構造整合の独立判定（本線 /develop）
       │    │    ├── test-designer.md               # GWT＋契約から Red テスト（実装前）
       │    │    ├── frontend-ui-implementer.md     # Phase4a-1 見た目（ビュー層・媒体は platform 依存）
       │    │    ├── frontend-logic-implementer.md  # Phase4a-2 frontend 処理・純粋関数
@@ -129,6 +129,7 @@ claude-harness/
       ├── skills/                           # 🛠️ 共通スキル（description で自動起動 / /name で明示起動）
       │    │  ※ skill は必ず skills/<name>/SKILL.md の1階層に置く（Claude Code はこの階層しか探索しない）
       │    ├── develop/SKILL.md                    # 🎼 開発の指揮者（orchestrator）。核・台本を内包。入口 /develop
+      │    ├── develop-light/SKILL.md              # 🎼 小CRUD向けの薄い orchestrator。agents/rules は develop 共用。入口 /develop-light（人間明示のみ）
       │    ├── translate-manga-ko-ja/SKILL.md      # 🈯 翻訳の指揮者（orchestrator）。maker/judge を起動。入口 /translate-manga-ko-ja
       │    ├── grilling/SKILL.md                   # 計画・設計を詰めるインタビュー
       │    └── docs-migrate/SKILL.md               # 🔧 docs の現行レイアウト準拠検査＋移行。入口 /docs-migrate
@@ -160,6 +161,7 @@ orchestrator を伴う手続き（`develop`・`translate-manga-ko-ja` など）�
 - **skill は複製しない。** 型は rules、craft は agent body が SSOT。skill は「どう回すか」だけを持ち、両者の中身をコピペしない。
 - **作る主体 ≠ 判定する主体。** どちらの手続きも producer（develop=implementer 群 / 翻訳=maker）と独立オラクル（develop=oracle/attacker 群 / 翻訳=judge）を**別 agent・別コンテキスト**に分ける。
 - **キー名は3木で一致させる。** 新しい手続きを足すときも、この3木を同名で生やす（skills/agents/rules すべて同じ `<key>`）。
+- **例外 — orchestrator 変種**: 台本だけ薄い別入口が要るとき（例: `skills/develop-light/`）は、**agents / rules を親キー（`develop`）と共用してよい**。フル3木を複製しない。`develop-light` は成果物形は本線と同型で、検証の厚みだけ落とす（人間明示の `/develop-light` のみ。AI 自己選択禁止）。
 
 ## 🚀 使い方
 
