@@ -16,7 +16,7 @@ description: 小規模な単一スライス（標準 CRUD 等）を、本線 /de
 - **人間ゲート**: SSOT・UI 見た目・（スキーマを触るときの）DB 設計は人間承認必須。サブエージェントは自己承認せず、確認の儀式は orchestrator が行う。
 - **SSOT 先行・契約先行**: コードは真実の源にしない。**契約 `fixed` 前に UI／実装コードを触らない。**
 - **実装着手ゲート**: 本線 develop §2 と同じ（規模による免除は不可）。欠けたら戻り先は §2 表に従う。
-- **完成条件**: テスト緑は前提であって完成ではない。`slice-attacker`（予算 3）が壊せなかったこと。
+- **完成条件**: テスト緑は前提であって完成ではない。`slice-reviewer` の欠陥リストが空であること。
 - **エスカレーション**: 適格条件が崩れたら光を続行せず、未完了を報告して本線 `/develop` へ誘導する。
 
 ## 2. 適格判定（起動直後・必須）
@@ -29,7 +29,7 @@ description: 小規模な単一スライス（標準 CRUD 等）を、本線 /de
 4. 画面はおおよそ 1、追加・変更する operation はおおよそ **2 以下**（単一リソースの標準 CRUD 想定）
 5. スライス横断の NFR・権限モデル再設計が主目的でない
 
-走行中に上記が崩れたら（契約が横断語彙の大幅追加を要する、攻撃が横断欠陥を晒す、SSOT が固めた構造に触る等）**そこで止めて本線へエスカレーション**。
+走行中に上記が崩れたら（契約が横断語彙の大幅追加を要する、reviewer が横断欠陥を晒す、SSOT が固めた構造に触る等）**そこで止めて本線へエスカレーション**。
 
 ## 3. 本線との差分（正）
 
@@ -39,10 +39,10 @@ description: 小規模な単一スライス（標準 CRUD 等）を、本線 /de
 | Phase2 skeleton | 条件付き | **常に省略** |
 | DB | 常に人間ゲート | **スキーマ変更時のみ**（無しならスキップし理由を報告／台帳メモ） |
 | structure-oracle | AI 独立判定 | **起動しない**（機械 lint のみ） |
-| system-attacker | あり | **省略** |
-| test-designer | トラック別×3 | **×1（担当トラック未指定＝全 3 トラック一括）** |
+| slice-reviewer | あり | **同じ（×1）** |
+| slice-attacker / system-attacker | 本 skill では起動しない（`/attack` 専用） | **同じ** |
+| test-designer | **×1（`backend処理` のみ。UI／FE トラックは起動しない）** | **同じ（BE のみ ×1）** |
 | FE UI / logic | 2 トラック設計 | **逐次 ui→logic**（人間一瞥は UI 完了時） |
-| slice-attacker 予算 | 10 | **3** |
 | サーキットブレーカー | 3 ラウンド | **2 ラウンド**で人間昇格 |
 | 実装着手ゲート | 免除不可 | **同じ** |
 
@@ -52,8 +52,8 @@ description: 小規模な単一スライス（標準 CRUD 等）を、本線 /de
 適格判定
   → Phase1 SSOT（1 機能）
   → Phase3 構造（DB 変更時のみ db-designer → 契約 → 機械 lint → orchestrator が契約 fixed）
-  → Phase4 振る舞い（test-designer×1 → FE 逐次 ui→logic ∥ BE）
-  → slice-attacker（予算 3）
+  → Phase4 振る舞い（test-designer BE×1 ∥ FE ui → logic ∥ BE）
+  → slice-reviewer
   → committer
 ```
 
@@ -94,19 +94,19 @@ description: 小規模な単一スライス（標準 CRUD 等）を、本線 /de
 
 契約 `fixed` 後のみ。
 
-1. `test-designer` を **1 回だけ**起動。**担当トラックは未指定**（agent 仕様どおり UI表示／frontend処理／backend処理の全トラックを書く）。実装コードは見させない。
-2. Red 受領後:
-   - `backend-logic-implementer`（🤖）を開始可能
-   - FE は **逐次**: 先に `frontend-ui-implementer`（🙋 人間一瞥）→ 承認後に `frontend-logic-implementer`（🤖）
-   - BE は FE の ui と**並行してよい**（書き込み先が交差しなければ）
-3. 結合の専任工程は置かない（本線と同じ。契約適合が縁）。
-4. 契約を変えたくなったら実装を止め Phase3 へ戻る。適格を破る変更なら本線へエスカレーション。
+1. `test-designer` を **`backend処理` で 1 回だけ**起動（UI表示／frontend処理は起動しない。FE テストは当面作らない）。実装コードは見させない。
+2. **依存の即開始**:
+   - BE Red 受領で `backend-logic-implementer`（🤖）
+   - FE は **逐次**: 契約 `fixed` 後に `frontend-ui-implementer`（🙋 人間一瞥。UI Red は渡さない）→ 承認後に `frontend-logic-implementer`（🤖。FE Red は渡さない）
+   - 4a-1 は test-designer と**並行してよい**。BE は FE の ui と**並行してよい**（書き込み先が交差しなければ）
+3. 結合の専任工程は置かない（本線と同じ。機械オラクルは BE。FE 穴は人間一瞥＋ `slice-reviewer`）。
+4. FE／BE 実装が揃ったら **`slice-reviewer`** を起動。欠陥ゼロまで反復（サーキットブレーカーは §6）。**attacker は起動しない。**
+5. 契約を変えたくなったら実装を止め Phase3 へ戻る。適格を破る変更なら本線へエスカレーション。
 
-### 攻撃・完了
+### 検証・完了
 
-- `slice-attacker` を起動。**攻撃予算は必ず 3**（渡さない・無制限は禁止）。
-- `system-attacker` は起動しない。
-- 破壊失敗（成功一覧が空）なら `committer` へ。未実行候補は報告に残す（無言切り捨て禁止）。追加ラウンドが要りそうなら、light のまま予算を増やさず本線エスカレーションを検討する。
+- `slice-reviewer` の欠陥リストが空なら `committer` へ。
+- `slice-attacker` / `system-attacker` は起動しない（必要なら人間が `/attack`）。
 
 ## 5. 実装着手ゲート
 
@@ -125,7 +125,7 @@ description: 小規模な単一スライス（標準 CRUD 等）を、本線 /de
 - 指摘は同一ラウンドの全件をまとめて 1 回で差し戻す。
 - **サーキットブレーカー: 同一欠陥が 2 ラウンド経っても解消しなければ 🙋 人間へ昇格**（本線は 3。light は早期に上げる）。
 - 振る舞いだけの SSOT 変更 → 現スライスへ戻る。固めた構造に触る変更 → Phase1→3 再実行、または本線エスカレーション。
-- フェーズ遷移ごとに `docs/specs/specs.md` の工程列を orchestrator が更新する。
+- フェーズ遷移ごとに `docs/specs/specs.md` の工程列（`定義`→`構造`→`実装`→`検証`→`完了`）を orchestrator が更新する。
 - docs 衛生の振り分け（PRD／ADR／issue／commit message）は本線 develop のルーティング表に従う。
 
 ## 7. Agent 配線
@@ -137,15 +137,15 @@ description: 小規模な単一スライス（標準 CRUD 等）を、本線 /de
 | `ssot-definer` | P1 | 1 機能スコープ、既存 SSOT パス（更新時） | 🙋 |
 | `db-designer` | P3（変更時のみ） | SSOT、既存スキーマ、FW の `db.md` パス（あれば） | 🙋 |
 | `contract-author` | P3 | 確定 SSOT、確定 DB（あれば）、共通語彙パス | 🤖 |
-| `test-designer` | P4 前 | GWT、契約、**トラック未指定**、FW テスト規約パス | 🤖 ×1 |
-| `frontend-ui-implementer` | P4 FE-1 | SSOT、契約 response、UI テスト(Red)、FW 規約パス | 🙋 |
-| `frontend-logic-implementer` | P4 FE-2 | 契約、実装済見た目、FE テスト(Red)、FW 規約パス | 🤖 |
+| `test-designer` | P4 前 | GWT、契約、**担当トラック=`backend処理`**、FW テスト規約パス（BE 束） | 🤖 ×1（BE のみ） |
+| `frontend-ui-implementer` | P4 FE-1 | SSOT、契約 response、FW 規約パス（**UI Red は渡さない**） | 🙋 |
+| `frontend-logic-implementer` | P4 FE-2 | 契約、実装済見た目、FW 規約パス（**FE Red は渡さない**） | 🤖 |
 | `backend-logic-implementer` | P4 BE（∥ FE-1 可） | 契約、SSOT、BE テスト(Red)、FW 規約パス | 🤖 |
-| `slice-attacker` | 実装後 | スライス、GWT、契約、環境、**攻撃予算 3** | 🔴 |
-| `committer` | 攻撃通過後 | 意図・差分範囲・PR 要否 | 🛠 |
+| `slice-reviewer` | 実装後 | スライス、GWT、契約、BE テスト、変更範囲 | 🔴 |
+| `committer` | 検証通過後 | 意図・差分範囲・PR 要否 | 🛠 |
 | `adr-writer` | 決定発生時 | Context／Decision／Consequences | 🛠 |
 
-**起動しない**: `skeleton-runner`、`structure-oracle`、`system-attacker`。
+**起動しない**: `skeleton-runner`、`structure-oracle`、`slice-attacker`、`system-attacker`。
 
 ### 受信時アクション（要点）
 
@@ -154,7 +154,7 @@ description: 小規模な単一スライス（標準 CRUD 等）を、本線 /de
 | SSOT／DB／UI のドラフト＋確認論点 | 🙋 → 承認で fixed／確定、否なら再起動 |
 | 契約 draft | 機械 lint → 成功で orchestrator が fixed／失敗で差し戻し |
 | `_shared` 追加要望 | orchestrator が反映してから次ラウンド |
-| テスト赤・攻撃成功 | 指摘全件を 1 ラウンドで差し戻し（上限 2。人間オラクル原因なら 🙋） |
+| テスト赤・欠陥リスト | 指摘全件を 1 ラウンドで差し戻し（上限 2。人間オラクル原因なら 🙋）。reviewer 空なら committer |
 | 適格崩れ・横断欠陥 | 本線 `/develop` へエスカレーション |
 
 ## 8. FW 固有規約（パス渡し）
@@ -166,9 +166,9 @@ description: 小規模な単一スライス（標準 CRUD 等）を、本線 /de
 - [ ] 対象 1 機能の SSOT（GWT）が `fixed`
 - [ ] DB 変更があれば人間確認済み／なければスキップ理由を報告に残した
 - [ ] 契約が機械 lint 通過のうえ `fixed`
-- [ ] UI 人間一瞥済み、FE／BE が契約適合テスト緑
-- [ ] `slice-attacker`（予算 3）が破壊に失敗
+- [ ] UI 人間一瞥済み、FE が契約準拠、BE がテスト緑（FE 単体テストは当面不要）
+- [ ] `slice-reviewer` の欠陥リストが空
 - [ ] 適格条件を破っていない（破ったら本線へ未完了で渡す）
 - [ ] 台帳の工程列が実態と一致
 
-**「テストが全部通ったから完成」は完成条件ではない。**
+**「テストが全部通ったから完成」は完成条件ではない。** `/attack` は完成条件に含めない。

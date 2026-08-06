@@ -9,7 +9,7 @@
 //  仕組み:
 //    Claude Code の PreToolUse フックとして起動され、stdin の JSON から書き込み
 //    対象パスを取り出す。対象が「実装コード」（--code glob にマッチ）なら、
-//    docs/specs/specs.md の台帳（工程列）を読み、実装中（工程=実装|攻撃）の
+//    docs/specs/specs.md の台帳（工程列）を読み、実装中（工程=実装|検証）の
 //    全機能について spec / 契約の fixed を検証する。欠けていれば exit 2 で
 //    ツール実行そのものをブロックし、stderr の理由が AI に差し戻される。
 //
@@ -17,7 +17,7 @@
 //    - docs 配下・.claude 配下・--code 非マッチ・--exclude マッチ → 許可（exit 0）。
 //      SSOT を書く行為はゲートの前提なので docs は常に通す。
 //    - 実装コードへの書き込みで、
-//        specs.md（台帳）が無い / 工程=実装|攻撃 の行が無い /
+//        specs.md（台帳）が無い / 工程=実装|検証 の行が無い /
 //        該当機能の spec が fixed でない / 契約が無い・fixed でない
 //      → ブロック（exit 2）。ここは fail-closed（ゲートの存在意義）。
 //    - stdin が解釈できない等の内部エラー → 許可（exit 0）。フック自身の不具合で
@@ -87,7 +87,9 @@ function parseFrontmatter(text) {
 	return data;
 }
 
-const STAGES = ["定義", "構造", "実装", "攻撃", "完了"];
+const STAGES = ["定義", "構造", "実装", "検証", "完了"];
+// 旧工程名「攻撃」は「検証」の別名として台帳読取時のみ認める
+const ACTIVE_STAGES = new Set(["実装", "検証", "攻撃"]);
 
 function parseLedger(body) {
 	const rows = [];
@@ -103,7 +105,7 @@ function parseLedger(body) {
 		rows.push({
 			id: idm[0],
 			status: cells.find((c) => c === "draft" || c === "fixed") || null,
-			stage: cells.find((c) => STAGES.includes(c)) || null,
+			stage: cells.find((c) => STAGES.includes(c) || c === "攻撃") || null,
 		});
 	}
 	return rows;
@@ -193,11 +195,11 @@ function main() {
 		]);
 
 	const ledger = parseLedger(readFileSync(ledgerFile, "utf8"));
-	const active = ledger.filter((r) => r.stage === "実装" || r.stage === "攻撃");
+	const active = ledger.filter((r) => r.stage && ACTIVE_STAGES.has(r.stage));
 	if (active.length === 0)
 		block([
 			`対象: ${rel}`,
-			`specs.md の台帳に 工程=実装（または 攻撃）の機能がありません。`,
+			`specs.md の台帳に 工程=実装（または 検証）の機能がありません。`,
 			"実装に入る機能の spec / 契約を fixed にしたうえで、orchestrator が台帳の工程列を「実装」へ更新してから書くこと。",
 		]);
 
@@ -218,7 +220,7 @@ function main() {
 			);
 	}
 	if (problems.length > 0)
-		block([`対象: ${rel}`, `実装中（工程=実装|攻撃）の機能に未充足があります:`, ...problems.map((p) => "  - " + p)]);
+		block([`対象: ${rel}`, `実装中（工程=実装|検証）の機能に未充足があります:`, ...problems.map((p) => "  - " + p)]);
 
 	process.exit(0);
 }

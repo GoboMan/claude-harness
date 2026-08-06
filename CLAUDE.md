@@ -25,10 +25,10 @@
 | --- | --- |
 | 常駐ゼロ | ベースラインに載るルールは 0。発見は `paths` ゲートと skill 起動だけ |
 | 3木揃え | 手続きキー `<key>` は `skills/<key>`・`agents/<key>`・`rules/<key>` で同名 |
-| 作る ≠ 判定する | producer と oracle/attacker/judge は別 agent・別コンテキスト |
+| 作る ≠ 判定する | producer と oracle/reviewer/attacker/judge は別 agent・別コンテキスト |
 | skill = 回し方 | orchestrator の判断核・台本のみ。型は rules／templates、craft は agent body |
 
-**orchestrator 変種の例外:** 台本だけ薄い別入口（例: `skills/develop-light`）は、agents / rules を親キー（`develop`）と共用してよく、フル3木を新設しない。craft・規約の二重化を避ける。
+**orchestrator 変種の例外:** 台本だけ薄い別入口（例: `skills/develop-light`、`skills/attack`）は、agents / rules を親キー（`develop`）と共用してよく、フル3木を新設しない。craft・規約の二重化を避ける。
 
 ---
 
@@ -97,13 +97,13 @@ model: opus | inherit        # 下記の割り当て規則に従う。Cursor 射
 ```
 
 - producer: 入力契約 → craft → 出力契約。自己承認（`fixed` 化）しない。
-- oracle / attacker / judge: **不整合・欠陥の摘発**が任務。一致確認で満足しない。原則修正しない。
+- oracle / attacker / judge / reviewer: **不整合・欠陥の摘発**が任務。一致確認で満足しない。原則修正しない。
 
 **`model:` の割り当て規則（機械オラクルの有無で切る）**
 
 | ゾーン | 該当 | `model:` | 理由 |
 | --- | --- | --- | --- |
-| 判断ゾーン（機械で反証できない） | ssot-definer / db-designer / contract-author / test-designer / adr-writer、および全 oracle・attacker・judge | `opus` 固定 | 下流全部の拠り所になる成果物。ここの劣化は「正しく間違った実装」を生む |
+| 判断ゾーン（機械で反証できない） | ssot-definer / db-designer / contract-author / test-designer / adr-writer / slice-reviewer、および全 oracle・attacker・judge | `opus` 固定 | 下流全部の拠り所になる成果物。ここの劣化は「正しく間違った実装」を生む |
 | 決定論ゾーン（機械オラクルがある） | 実装 producer 3体 / skeleton-runner / committer | `inherit` | テスト・ビルドが合否を決めるのでモデル差が最終品質に出にくい。取り込み先セッションの選択に委ねる |
 
 > **`sonnet` をベタ書きしない。** 共有 harness なので、決定論ゾーンにモデルを固定すると取り込み先の予算・モデル選択まで縛ってしまう（§0「プロジェクト固有の逸脱をここに書かない」）。opus セッションで回せば `inherit` は実質 opus になる。

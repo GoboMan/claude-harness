@@ -20,7 +20,7 @@ paths:
 > [backend/coding.md](../backend/coding.md)（Actions 本体・オニオン。FE 実装体の束に含まれる — develop skill §6-B）。
 > データの向きと状態の置き場は [dataflow.md](./dataflow.md)。
 > コンポーネントの粒度は [components.md](./components.md)、画面の住所は [routing.md](./routing.md)。
-> テストは [testing.md](./testing.md)（共通の配線は [common/testing.md](../common/testing.md)）。
+> **FE テストは当面起票しない**（frontend の testing 葉は置かない。共通の配線は [common/testing.md](../common/testing.md)）。
 > 本書は**それに従ったうえで**、RSC／Client の境界と page の薄さだけを定める。共通側の再掲はしない。
 >
 > **ディレクトリ名（`components/` 等）は harness では固定しない。** 住所はプロジェクトの `CLAUDE.md` に記録する。

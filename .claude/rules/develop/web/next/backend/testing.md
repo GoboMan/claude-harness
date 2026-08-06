@@ -24,7 +24,7 @@ paths:
 > 役割ごとに何をどう試すかだけを扱う。共通側の再掲はしない。
 >
 > 責務分離は [backend/coding.md](./coding.md)。
-> **読み取り配線（RSC page）の薄い試験は frontend**（[frontend/testing.md](../frontend/testing.md) §3）。
+> **読み取り配線（RSC page）の FE 側試験は当面起票しない**（frontend の testing 葉は置かない）。
 
 ---
 

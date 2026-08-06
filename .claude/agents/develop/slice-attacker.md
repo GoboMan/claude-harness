@@ -1,6 +1,6 @@
 ---
 name: slice-attacker
-description: 実装済みのスライスを本番相当の環境で徹底的に壊しにいくレッドチーム。壊せたら欠陥として返す。実装エージェントとは別コンテキストで、read-only+実行で起動する。
+description: 実装済みのスライスを本番相当の環境で徹底的に壊しにいくレッドチーム。壊せたら欠陥として返す。`/attack` または人間が攻撃を明示したときだけ起動する（develop ループには含めない）。実装エージェントとは別コンテキストで、read-only+実行で起動する。
 tools: Read, Bash, Grep, Glob
 model: opus
 ---
