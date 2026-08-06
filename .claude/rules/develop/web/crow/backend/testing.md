@@ -5,12 +5,70 @@ paths:
 
 # 🧪 crow / backend — テスト設計（PHPUnit）
 
-> **共通則は [common/testing.md](../common/testing.md)**（1テスト=1振る舞い・失敗系を含める・モックは境界だけ・
-> 決定性・コマンド一発・命名・カバレッジの扱い）。本書は**それに従ったうえで**、
-> PHPUnit 固有の書き方だけを扱う。共通側の再掲はしない。
+> **共通則は [common/testing.md](../common/testing.md)**（テスト対象はドメインだけ・1テスト=1振る舞い・
+> 失敗系を含める・モックは境界だけ・決定性・コマンド一発・命名・カバレッジの扱い）。本書は**それに従ったうえで**、
+> PHPUnit 固有の書き方と、crow 生成面の除外を扱う。共通側の再掲はしない。
 >
 > コードは [common/coding.md](../common/coding.md) のスタイル（Allman・snake_case・strict 比較・`!` 禁止）に従う。
 
+---
+
+## 何を Red にするか（kernel／生成面は除外）
+
+共通則の「テスト対象はドメイン（手書き）だけ」を backend で機械的に切る。
+
+**Red の対象（手書き・`app/`）**
+
+- `app/classes/_common_/model_<table>.php` に**自分で定義した**インスタンス／static メソッド
+- 拡張フック（`validation_crow_ext()` / `save_crow_ext()` / `trash_crow_ext()` / `delete_crow_ext()`）
+- `module_*` の `action_*` および、どのテーブルにも属さない手書きユーティリティ（例: `modifier` の独自ヘルパ）
+
+**Red にしない（1）— `engine/kernel/**`**
+
+SUT が crow 本体であるテストは起こさない。例:
+
+- `crow_db_table_model::input_from_request()` が受け付ける datetime キー形の網羅・特性化
+- kernel のバリデーション／CSRF／viewpart 解決／mysqli 層そのものの挙動固定
+- 「engine は直接直さないので実測して表を固定する」類の characterization（それは framework 側の関心。app ゲートを直すなら **ゲート側**を Red にする）
+
+**Red にしない（2）— crow が差し込む生成メンバ**
+
+[backend/coding.md](./coding.md) の「生成済みメンバを再定義しない」と同じ集合。例:
+
+- フィールド本体、`m_table_name` / `table_name` / `primary_key`
+- `sql_select_all()` / `sql_select_one()`（定型クエリを別名で生やした手書きメソッドは対象）
+- 定数／enum まわりの `get_<field>_keys()` / `_map()` / `_symbols()` / `get_<field>_str()` / `<field>_str()`
+- 参照テーブルの `<refer>_row()`
+- `db_design.txt` ↔ 生成キャッシュ／`get_*_map()` の一致を値ごとに写経する sync テスト
+
+```php
+//  NG: kernel の入力形を特性化する（SUT が engine）
+public function test_engine_resolves_split_date_keys()
+{
+    //  crow_db_table_model::input_from_request() を実測して固定する、など
+}
+
+//  NG: 生成された定数マップを値ごとに写経する（enum が増えるたびケースが増えるだけ）
+public function test_status_map_contains_active()
+{
+    $this->assertArrayHasKey("active", model_user::get_status_map());
+}
+
+//  OK: 手書きドメイン／ゲートが、ある入力のときにどう振る舞うかを検証する
+public function test_is_active_returns_false_when_status_is_banned()
+{
+    $row = new model_user();
+    $row->status = "banned";
+    $this->assertFalse($row->is_active());
+}
+```
+
+**境界の判定（迷ったらここ）**
+
+| 問い | Yes → | No → |
+| --- | --- | --- |
+| 落ちたとき直すコードは `app/` か？ | 対象になりうる | 対象外（kernel／生成面） |
+| 既存の `engine_*_characterization_*` や生成 map sync を増やそうとしているか？ | 止める | — |
 ---
 
 ## ツールと配置
@@ -165,9 +223,10 @@ PHPUnit の既定探索は `tests` 配下を再帰的に拾うので、**`<exclu
 ## ✅ テスト着手前チェックリスト
 
 - [ ] 対象の GWT 受け入れ条件（orchestrator が渡す）を先に確認したか
+- [ ] **検証対象は手書きドメイン（`app/`）か**（`engine/kernel`・生成メンバ・enum アクセサ網羅・engine 特性化になっていないか）
 - [ ] `phpunit.xml` のファイル探索サフィックスが crow の命名と一致しているか
 - [ ] 書こうとしているテストは実 DB・実サービスに繋ぐか（繋ぐなら `tests/integration/`、繋がないなら `tests/` 直下）
 - [ ] `phpunit.xml` の既定スイートが `tests/integration` を `<exclude>` しているか
 - [ ] `assertSame` / `assertTrue|False` / `assertNull` で strict に検証しているか（`!` を使っていないか）
-- [ ] 入力バリエーションをデータプロバイダにまとめ、ケース名を付けたか
+- [ ] 入力バリエーションをデータプロバイダにまとめ、ケース名を付けたか（kernel／生成面の値一覧展開になっていないか）
 - [ ] スーパーグローバル・静的状態を元に戻しているか
