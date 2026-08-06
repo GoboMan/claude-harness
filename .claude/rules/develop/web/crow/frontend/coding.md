@@ -11,6 +11,9 @@ paths:
 > 共通側の再掲はしない。
 >
 > 対象は crow の view（HTML＋埋め込み PHP）・CSS・JS を書く／直すとき。
+> **ビューパーツ固有**（セクション DSL・バインド・親子・dbc／ajax）は
+> [viewpart.md](./viewpart.md) / [viewpart-dataflow.md](./viewpart-dataflow.md) /
+> [viewpart-components.md](./viewpart-components.md) が正。本書へ写さない。
 
 ## HTML 中のコメント
 
@@ -30,6 +33,31 @@ HTML コメントはそのままクライアントへ送出されてしまうた
 [common/coding.md](../common/coding.md) の「横幅 半角 80 文字を基準に折り返す」に従うが、
 **HTML はタグの途中で折り返さない**。80 文字を超えてもタグは 1 つのまとまりとして保つ。
 
+## CSS
+
+トークン・重複禁止・`<style>` のスコープは
+[viewpart-components.md](./viewpart-components.md) §7 が正。
+本書では再掲しない。生の色コードをパーツ `<style>` に直書きしない、も同節。
+
+## JavaScript の変数宣言
+
+**`var` は使わない。** `let` / `const` を使う。再代入しない値は `const`。
+
+```javascript
+//  NG
+var count = 0;
+
+//  OK
+let count = 0;
+const max_page = 10;
+```
+
+## JavaScript の文字列
+
+文字列リテラルは **ダブルクォート `"..."` を基本**とする
+（既存コード・PHP 側の慣習と揃える）。テンプレートリテラル `` `...` `` は
+改行や式埋め込みが必要なときに限る。
+
 ## JavaScript における配列・オブジェクトの末尾カンマ
 
 JavaScript では、配列やオブジェクトの**末尾要素の行末をカンマで終わる**ようにする（2024/12/23）。
@@ -37,8 +65,8 @@ JavaScript では、配列やオブジェクトの**末尾要素の行末をカ�
 ```javascript
 let obj =
 {
-    key1 : "value1",
-    key2 : "value2",
+	key1 : "value1",
+	key2 : "value2",
 };
 ```
 

@@ -80,7 +80,8 @@ paths:
 3. `app/viewparts/[role]/[module]/_common_`
 4. `app/viewparts/[role]/[module]/[action]`
 
-**置き場は共有範囲で決める。** 何層に置くかの判断は [viewpart-components.md](./viewpart-components.md) §6 に従う。
+**置き場は共有範囲で決める。** 住所の正本は [viewpart-components.md](./viewpart-components.md) **§1**、
+共通化の切り出し判断は同 **§6** に従う。
 
 ### パーツ名はフォルダ構成から機械的に決まる
 

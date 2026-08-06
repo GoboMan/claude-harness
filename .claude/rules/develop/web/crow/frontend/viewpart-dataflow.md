@@ -350,8 +350,12 @@ crow にリストレンダリングのディレクティブは無いので描画
 **画面のどこからでも上げる必要があり、受け手がルートに 1 つしかない**通知に限って `postup` を使う。
 典型はエラーダイアログとメッセージ表示で、中間の全パーツにクロージャを通すのが不合理なケースである。
 
+**発信してよいのは feature 以上（feature / scene / root）だけ。**
+`ui` / `parts` は `postup` 禁止（クロージャ props で親へ返す。
+[viewpart-components.md](./viewpart-components.md) §3）。
+
 ```php
-//	子: 横断的な通知だけは postup を使う
+//	feature 以上: 横断的な通知だけは postup を使う
 self.postup('error', ["E001", "保存に失敗しました"]);
 ```
 
@@ -407,6 +411,82 @@ dbc.bind("user.list", user_id, self, "user_row");
   バインド済みの prop は**古い値のまま残る**。消えた行を反映する必要があるなら、
   `remove` 系を使うか、描画側で dbc のリストを引き直す
 
+### 通信と応答の適用（ajax / 契約）
+
+誰が通信してよいかは [viewpart-components.md](./viewpart-components.md) §9（feature まで）。
+ここでは **出し方と応答の載せ方**を定める。
+
+#### 発行前は fail-closed
+
+必要条件（担当者・選択中行・契約必須キーなど）が揃うまで **ajax を出さない**。
+揃わないときは空表示やスケルトンに留め、**緩い条件で取りにいかない**
+（サーバの母集団強制や権限が黙って消える経路を作らない）。
+
+リクエスト組み立ては feature 内の **単一経路**（例: `build_*_request_params`）に寄せ、
+タブ・ページングなど全 UI 操作がそこを通るようにする。
+
+#### 成功時の載せ方
+
+| データの性質 | 載せ先 |
+| --- | --- |
+| 画面内で複数パーツが共有する一覧・行 | `dbc.set` / `dbc.set_list` / `dbc.merge_list`。子は `dbc.bind` |
+| その feature だけの局所状態 | 自パーツの props |
+
+- 成功コールバックで **DOM を直接組み立てて状態源にしない**（§1・§4）。
+  載せてから、既存の単一描画メソッド／子生成へ進む。
+- 契約の response 形に沿って載せる（キー名は機能の契約が正。
+  `rows` / `rows_with_id` / `pager` は**よくある例**であり必須キー一覧ではない）。
+
+#### 陳腐化した応答を適用しない
+
+`ajax.post` 等は abort ハンドルを返さず、配送済みの応答も止められないことがある。
+連打・タブ切替では **リクエスト世代（seq）** を持ち、
+
+- 発行ごとに seq を進める
+- 応答適用前に「この応答は最新世代か」を判定する
+- **最新以外は一覧・状態へ書き込まない**（fail-closed）
+
+陳腐化応答の失敗で、最新世代の一覧を空表示へ潰さない。
+
+#### 失敗時
+
+- サーバが返したメッセージを toast／画面エラーへ **提示**する（言い換え・握りつぶしは §9）。
+- 一覧を空にするか直前表示を残すかは機能仕様に従う。どちらかを明示し、曖昧にしない。
+- スケルトンを出しっぱなしにしない（失敗時も畳む）。
+
+```php
+//  概形（名前は機能に合わせる）
+let request_seq = self.next_list_request_seq(self.prop('list_request_seq'));
+self.prop('list_request_seq', request_seq);
+
+ajax_or_helper
+(
+	params,
+	(data_) =>
+	{
+		if( self.should_apply_list_response(request_seq, self.prop('list_request_seq')) === false )
+		{
+			return;
+		}
+		//	data_ のキーは契約に従う（以下は例）
+		dbc.set_list('example.list', data_.rows_with_id);
+		self.prop('pager', data_.pager);
+		self.render_list();
+	},
+	(code_, msg_) =>
+	{
+		if( self.should_apply_list_response(request_seq, self.prop('list_request_seq')) === false )
+		{
+			return;
+		}
+		dbc.set_list('example.list', null);
+		self.render_empty();
+		//	トースト API 名はプロジェクト側。サーバ文言 msg_ を提示する
+		show_error(msg_);
+	}
+);
+```
+
 ---
 
 ## 6. 手続きが許されるのは「イベント配線」だけ
@@ -452,4 +532,9 @@ crow には宣言的なイベントディレクティブが無いので、`<read
 - [ ] クロージャを `<props>` の中で定義していないか（`null` 宣言 ＋ `<init>` で代入になっているか）
 - [ ] 子がクロージャを呼ぶ前に `null` を確認しているか／`<init>` で呼んでいないか
 - [ ] `postup` を使った箇所に「なぜ横断なのか」のコメントがあり、`true` で伝播を止めているか
+- [ ] `postup` の発信が feature 以上か（ui / parts から上げていないか）
 - [ ] `<ready>` がイベント配線だけに収まっているか
+- [ ] 通信前ゲートが fail-closed か（必要条件未充足で ajax していないか）
+- [ ] 共有一覧の成功結果を `dbc`（または局所 props）経由で載せているか
+- [ ] リクエスト世代で陳腐化応答を捨てているか（最新以外を一覧へ書いていないか）
+- [ ] 失敗時にサーバ文言を提示し、スケルトンを畳んでいるか
