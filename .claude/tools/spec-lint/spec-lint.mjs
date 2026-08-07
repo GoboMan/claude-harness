@@ -41,8 +41,13 @@ const DIR_RE = /^F-\d+-[a-z0-9-]+$/;
 //  spec.md は 1 スライスで producer / oracle の 9 箇所が全文を読むため、分量は
 //  そのまま全エージェントのコンテキスト＝コストになる。書き手（ssot-definer）は
 //  数を数えず、validate の warn がゼロになるまで削ることで予算を守る。
+//  spec の本体は「業務ルール」（規則）で、「受け入れ条件」はそれだけでは解釈が
+//  割れる箇所に置く代表例。ケースの網羅は test-designer の職務なので、GWT の
+//  予算は規則より小さい（規則 1 本 → テスト N 本が正常な比率）。
 const MAX_SPEC_CHARS = 12000; //  spec.md 本文の文字数（行数では 1 行 1,000 字の肥大を見逃す）
-const MAX_GWT_BULLETS = 40; //  受け入れ条件の本数（1 GWT = 1 反証可能な観測）
+const MAX_RULE_BULLETS = 30; //  業務ルールの本数（1 規則 1 文）
+const MAX_RULE_CHARS = 150; //  規則 1 本の長さ（超えるのは複数規則の圧縮）
+const MAX_GWT_BULLETS = 15; //  受け入れ条件の本数（規則を補う代表例のみ。テストケース一覧ではない）
 const MAX_CROSS_REFS = 20; //  自機能以外の F-xxx 参照の総数（複製の密度）
 const MAX_CONTRACT_LINES = 400; //  契約 YAML は 1 行 1 キーの ASCII なので行数で測る
 
@@ -254,20 +259,42 @@ function checkHygiene(file, body, kind, opts = {}) {
 				`本文が ${chars} 文字（${MAX_SPEC_CHARS} 文字超）— 1 関心事を超えた堆積の疑い。spec.md は下流の全 producer / oracle が全文を読むため、肥大はそのまま全エージェントのコンテキストになる（負のリスト該当を排出する）`,
 			);
 
-		//  6-1) GWT の本数: 受け入れ条件は「1 GWT = 1 反証可能な観測」。
-		//       本数の膨張は、観測の追加ではなく規則の言い換え・境界の列挙・
-		//       欠陥ごとの 1 本追加が堆積している兆候。
-		const gwt = findSection(body, (t) => /受け入れ条件|GWT/.test(t));
-		if (gwt) {
-			//  最上位の箇条書きだけを数える（ネストは 1 つの観測の言い換え・補足で、
-			//  独立した観測ではない）。ネストへの逃避は文字数の閾値が受け止める。
-			const bullets = gwt.lines.filter((l) => /^[-*]\s+\S/.test(l)).length;
-			if (bullets > MAX_GWT_BULLETS)
+		//  6-1) 規則と代表例の本数。
+		//       最上位の箇条書きだけを数える（ネストは 1 つの規則・観測の補足であって
+		//       独立した項目ではない）。ネストへの逃避は文字数の閾値が受け止める。
+		const topBullets = (sec) =>
+			sec ? sec.lines.filter((l) => /^[-*]\s+\S/.test(l)).length : 0;
+
+		const ruleSec = findSection(body, (t) => /業務ルール/.test(t));
+		const rules = topBullets(ruleSec);
+		if (rules > MAX_RULE_BULLETS)
+			warn(
+				file,
+				`業務ルールが ${rules} 本（${MAX_RULE_BULLETS} 本超）— 1 機能の不変条件として過大。機能が大きすぎる疑い（分割を検討する）`,
+			);
+
+		//  本数の上限は、規則を段落で書けば簡単に迂回できる。1 規則 1 文を
+		//  守らせるため 1 本あたりの長さも見る（長い規則は複数の規則の圧縮）。
+		if (ruleSec) {
+			const long = ruleSec.lines
+				.filter((l) => /^[-*]\s+\S/.test(l))
+				.map((l) => l.length)
+				.filter((n) => n > MAX_RULE_CHARS);
+			if (long.length > 0)
 				warn(
 					file,
-					`受け入れ条件が ${bullets} 本（${MAX_GWT_BULLETS} 本超）— 1 機能の観測数として過大。規則の言い換え・境界の網羅列挙・欠陥ごとの追加が混ざっていないか（機能の分割も検討する）`,
+					`業務ルールに ${MAX_RULE_CHARS} 文字超の規則が ${long.length} 本（最長 ${Math.max(...long)} 文字）— 1 規則 1 文になっていない。複数の規則が 1 本に圧縮されていると、どれが破れたのか判定できない（文型はテンプレート templates/develop/spec.md 参照）`,
 				);
 		}
+
+		//  受け入れ条件は規則を補う代表例であって、テストケースの一覧ではない。
+		//  本数の膨張は、規則の言い換え・値違いの列挙・欠陥ごとの 1 本追加の堆積。
+		const gwt = topBullets(findSection(body, (t) => /受け入れ条件|GWT/.test(t)));
+		if (gwt > MAX_GWT_BULLETS)
+			warn(
+				file,
+				`受け入れ条件が ${gwt} 本（${MAX_GWT_BULLETS} 本超）— 受け入れ条件は業務ルールだけでは解釈が割れる箇所に置く代表例であり、テストケースの一覧ではない。規則の言い換え・値違いの列挙が混ざっていないか（ケースの網羅は test-designer の職務）`,
+			);
 
 		//  6-2) 他機能への参照密度: 「F-011 に準拠」と書いた上で振る舞いも書く、
 		//       という複製が起きると 1 機能の spec に他機能の spec が写り込む。
