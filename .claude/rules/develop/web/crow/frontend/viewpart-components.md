@@ -244,13 +244,14 @@ backend の正本は [backend/coding.md](../backend/coding.md)（action = ユー
 | 権限・状態ゲート・保存可否・競合など**業務判定** | **サーバ**（model が意味、action が進行） | FE だけではバイパスできるので正にしない |
 | UX 用の事前チェック（空欄・連打防止・確認ダイアログ） | **feature** | 最終判定は必ずサーバ |
 | **契約レスポンスの束ね**（`exit_ok` の payload 形） | **action** | Domain ではない。model に画面専用を入れない |
-| **見せ方・ラベル導出・画面上の並び** | **feature / scene** | 契約 payload を受けて FE が組み立てる |
+| **共有の表示ラベル・表示名など**（契約に載る） | **サーバ**（presenter → 契約） | FE は再導出せず提示する。詳細は backend §3.11 |
+| **画面固有の見せ方・画面上の並び** | **feature / scene** | 契約上の一覧行順はサーバ（SQL）が正。FE は正順を壊さない見せ方だけ |
 | 契約に沿った通信・`dbc` への反映 | **feature**（原則） | ui / parts は通信しない（§3）。scene は §9.2 |
 | リクエストボディの組み立て | **feature** | 契約のキー／型に沿う。ui / parts は props で値を上げるだけ |
 | `exit_ng` 等のエラー文言 | **サーバが正。feature は提示** | 業務意味を FE で言い換え・握りつぶししない |
 
-backend 正本は [backend/coding.md](../backend/coding.md) §1・§2。
-**契約レスポンスの束ね＝action／見せ方・ラベル導出＝feature** で両葉を揃える。
+backend 正本は [backend/coding.md](../backend/coding.md) §1・§2・§3.11。
+**契約に載った共有表示値は FE で再導出せず使う。載せない画面固有のラベル／見せ方だけ FE。**
 
 ### 9.2 通信してよい層
 
@@ -279,7 +280,8 @@ let request =
 //  … ajax → 成功なら dbc / props を更新、失敗ならサーバ文言を表示
 ```
 
-- 成功時: 契約の payload を props / `dbc` に載せる。画面用の並び・ラベル導出は feature 側。
+- 成功時: 契約の payload を props / `dbc` に載せる。
+  契約に載った共有表示値は再導出せず使う。画面固有の見せ方・並びだけ feature 側。
 - 失敗時: サーバが返したメッセージを**そのまま（または契約どおり）表示**する。
   「担当外」を FE が別文言に invent しない。
 
