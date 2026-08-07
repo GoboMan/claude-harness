@@ -37,6 +37,15 @@ const TEMPLATE_DIR = join(
 const SENTINELS = ["F-000", "YYYY-MM-DD"];
 const DIR_RE = /^F-\d+-[a-z0-9-]+$/;
 
+//  --- 肥大の閾値（本ツールが唯一の SSOT。producer craft に数値を書き写さない）---
+//  spec.md は 1 スライスで producer / oracle の 9 箇所が全文を読むため、分量は
+//  そのまま全エージェントのコンテキスト＝コストになる。書き手（ssot-definer）は
+//  数を数えず、validate の warn がゼロになるまで削ることで予算を守る。
+const MAX_SPEC_CHARS = 12000; //  spec.md 本文の文字数（行数では 1 行 1,000 字の肥大を見逃す）
+const MAX_GWT_BULLETS = 40; //  受け入れ条件の本数（1 GWT = 1 反証可能な観測）
+const MAX_CROSS_REFS = 20; //  自機能以外の F-xxx 参照の総数（複製の密度）
+const MAX_CONTRACT_LINES = 400; //  契約 YAML は 1 行 1 キーの ASCII なので行数で測る
+
 //  --- 収集した違反 ---
 const errors = [];
 const warns = [];
@@ -184,7 +193,7 @@ function checkSections(file, body, required, status) {
 
 //  --- docs 衛生（負のリスト混入の検出。SSOT は各 producer craft）---
 //  すべて warn（既存プロジェクトの validate を err で即死させない）。
-function checkHygiene(file, body, kind) {
+function checkHygiene(file, body, kind, opts = {}) {
 	const lines = body.split(/\r?\n/);
 
 	//  1) 冒頭ナラティブ: 最初のセクションまでの blockquote 群（改訂差分の堆積痕）
@@ -232,9 +241,53 @@ function checkHygiene(file, body, kind) {
 	}
 
 	//  6) 肥大の煙探知機
-	const maxLines = kind === "spec" ? 300 : 400;
-	if (lines.length > maxLines)
-		warn(file, `本文が ${lines.length} 行（${maxLines} 行超）— 1 関心事を超えた堆積の疑い（負のリスト該当を排出する）`);
+	//
+	//  行数では測らない。1 行 1,000 文字の spec が「358 行」で閾値をすり抜け、
+	//  下流の全エージェント（spec.md は 1 スライスで 9 箇所が読む）のコンテキストを
+	//  食い潰した実例があるため、spec は分量そのもの＝文字数で測る。
+	//  契約 YAML は 1 行 1 キーの ASCII なので行数が実効的な尺度のまま。
+	if (kind === "spec") {
+		const chars = body.length;
+		if (chars > MAX_SPEC_CHARS)
+			warn(
+				file,
+				`本文が ${chars} 文字（${MAX_SPEC_CHARS} 文字超）— 1 関心事を超えた堆積の疑い。spec.md は下流の全 producer / oracle が全文を読むため、肥大はそのまま全エージェントのコンテキストになる（負のリスト該当を排出する）`,
+			);
+
+		//  6-1) GWT の本数: 受け入れ条件は「1 GWT = 1 反証可能な観測」。
+		//       本数の膨張は、観測の追加ではなく規則の言い換え・境界の列挙・
+		//       欠陥ごとの 1 本追加が堆積している兆候。
+		const gwt = findSection(body, (t) => /受け入れ条件|GWT/.test(t));
+		if (gwt) {
+			//  最上位の箇条書きだけを数える（ネストは 1 つの観測の言い換え・補足で、
+			//  独立した観測ではない）。ネストへの逃避は文字数の閾値が受け止める。
+			const bullets = gwt.lines.filter((l) => /^[-*]\s+\S/.test(l)).length;
+			if (bullets > MAX_GWT_BULLETS)
+				warn(
+					file,
+					`受け入れ条件が ${bullets} 本（${MAX_GWT_BULLETS} 本超）— 1 機能の観測数として過大。規則の言い換え・境界の網羅列挙・欠陥ごとの追加が混ざっていないか（機能の分割も検討する）`,
+				);
+		}
+
+		//  6-2) 他機能への参照密度: 「F-011 に準拠」と書いた上で振る舞いも書く、
+		//       という複製が起きると 1 機能の spec に他機能の spec が写り込む。
+		//       参照そのものは正しいので、密度だけを見る。
+		const selfId = opts.selfId || "";
+		//  ID の桁数は DIR_RE 同様に固定しない（F-001 / F-0001 どちらの採番でも効く）
+		const refs = (body.match(/F-\d+/g) || []).filter((r) => r !== selfId);
+		if (refs.length > MAX_CROSS_REFS) {
+			const top = [...new Set(refs)].slice(0, 3).join(" / ");
+			warn(
+				file,
+				`他機能への参照が ${refs.length} 件（${MAX_CROSS_REFS} 件超。例: ${top}）— 参照先の振る舞いを複製していないか。共有される振る舞いは所有機能の spec だけが持ち、ここは参照 1 行に留める`,
+			);
+		}
+	} else if (lines.length > MAX_CONTRACT_LINES) {
+		warn(
+			file,
+			`本文が ${lines.length} 行（${MAX_CONTRACT_LINES} 行超）— 1 関心事を超えた堆積の疑い（負のリスト該当を排出する）`,
+		);
+	}
 }
 
 //  --- spec.md の検証 ---
@@ -244,7 +297,7 @@ function validateFeatureSpec(file, text, fmt) {
 	const status = checkStatus(file, data["ステータス"]);
 	checkSections(file, body, fmt.sections, status);
 	checkSentinels(file, text, status);
-	checkHygiene(file, body, "spec");
+	checkHygiene(file, body, "spec", { selfId: data["機能ID"] || "" });
 	//  状態セクションにハッピーパス以外が含まれるか（fixed のみ・警告）
 	const states = findSection(body, (t) => t.startsWith("状態"));
 	const statesText = states ? states.lines.join("") : "";
