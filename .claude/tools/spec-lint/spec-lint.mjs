@@ -245,6 +245,27 @@ function checkHygiene(file, body, kind, opts = {}) {
 		}
 	}
 
+	if (kind === "contract") {
+		//  4c) 業務ルールの契約への書き戻し（MIS 逸脱の煙探知機）
+		const dumpKeys =
+			body.match(
+				/^\s+x-(state-transition|evaluation-order|error-catalog|business-rule|internal-labels)\b/gm,
+			) || [];
+		if (dumpKeys.length > 0)
+			warn(
+				file,
+				`業務ルール再掲らしき x-* が ${dumpKeys.length} 件（例: ${dumpKeys[0].trim()}）— 規則・判定順序は spec.md。契約は境界の形だけ`,
+			);
+
+		//  5c) description 肥大（info/operation の長文。短い response description は許容）
+		const longDescs = countLongDescriptions(lines);
+		if (longDescs > 0)
+			warn(
+				file,
+				`長い description が ${longDescs} 件（8 行超または 200 字超）— 目的・規則・UI 説明は spec.md。契約は summary 1 行と短い注記のみ`,
+			);
+	}
+
 	//  6) 肥大の煙探知機
 	//
 	//  行数では測らない。1 行 1,000 文字の spec が「358 行」で閾値をすり抜け、
@@ -317,6 +338,36 @@ function checkHygiene(file, body, kind, opts = {}) {
 	}
 }
 
+//  YAML の description: ブロック／インラインが長い件数を数える（依存ゼロの行スキャン）
+function countLongDescriptions(lines) {
+	let count = 0;
+	for (let i = 0; i < lines.length; i++) {
+		const m = lines[i].match(/^(\s*)description:\s*(.*)$/);
+		if (!m) continue;
+		const indent = m[1].length;
+		const rest = m[2].replace(/\s+#.*$/, "").trim();
+		if (rest === ">" || rest === ">-" || rest === "|" || rest === "|-") {
+			let blockLines = 0;
+			let blockChars = 0;
+			for (let j = i + 1; j < lines.length; j++) {
+				const line = lines[j];
+				if (line.trim() === "") {
+					blockLines++;
+					continue;
+				}
+				const ind = line.match(/^(\s*)/)[1].length;
+				if (ind <= indent) break;
+				blockLines++;
+				blockChars += line.trim().length;
+			}
+			if (blockLines > 8 || blockChars > 200) count++;
+		} else if (rest.length > 200) {
+			count++;
+		}
+	}
+	return count;
+}
+
 //  --- spec.md の検証 ---
 function validateFeatureSpec(file, text, fmt) {
 	const { data, body } = parseFrontmatter(text);
@@ -336,6 +387,20 @@ function validateFeatureSpec(file, text, fmt) {
 	}
 	const inputSec = findSection(body, (t) => t.startsWith("入力"));
 	const inputs = inputSec ? tableFirstColumn(inputSec.lines) : [];
+	//  入力表に型・必須・制約列があると契約との二重化（MIS 逸脱）
+	if (inputSec) {
+		for (const line of inputSec.lines) {
+			const t = line.trim();
+			if (!t.startsWith("|")) continue;
+			if (/\|.*型.*\|/.test(t) || /必須/.test(t) || /制約/.test(t)) {
+				warn(
+					file,
+					`入力表に型・必須・制約列がある — 型情報の正は api-contract.yaml。spec の入力は「名前｜業務上の意味」のみ（templates/develop/spec.md）`,
+				);
+				break;
+			}
+		}
+	}
 	return { id: data["機能ID"] || null, status, inputs, statesText };
 }
 

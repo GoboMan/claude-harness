@@ -64,8 +64,8 @@ description: 小規模な単一スライス（標準 CRUD 等）を、本線 /de
 | 成果物 | 置き場所 | 書く主体 |
 | --- | --- | --- |
 | 機能一覧（台帳） | `docs/specs/specs.md` | `ssot-definer`／工程列は orchestrator |
-| 機能詳細＋GWT | `docs/specs/F-xxx-<slug>/spec.md` | `ssot-definer` |
-| 処理インターフェース契約 | `docs/specs/F-xxx-<slug>/api-contract.yaml` | `contract-author` |
+| 機能詳細（振る舞い）＋GWT | `docs/specs/F-xxx-<slug>/spec.md` | `ssot-definer` |
+| 処理インターフェース契約（境界の形） | `docs/specs/F-xxx-<slug>/api-contract.yaml` | `contract-author` |
 | 契約の共有語彙 | `docs/specs/_shared/components.yaml` | **orchestrator のみ** |
 | DB 設計 | framework／project が定める住所（無ければ `docs/db/schema.md`） | `db-designer`（変更時のみ） |
 | ADR | `docs/adr/` | `adr-writer`（決定発生時） |

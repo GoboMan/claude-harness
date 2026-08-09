@@ -1,19 +1,21 @@
 # 処理インターフェース契約（OpenAPI 3.1）— 1 機能 1 ファイル
+# 同ディレクトリの spec.md と合わせて機能の MIS（境界の形だけを持つ。振る舞い・規則は spec）
 # プレースホルダ（F-000 / YYYY-MM-DD / <...>）は fixed 化前に必ず実値へ置換する
+# info.description / operation.description に目的・業務ルール・UI 説明を書かない（→ spec.md）
 openapi: 3.1.0
 info:
   title: F-000 <機能名>
   version: 1.0.0
 x-feature-id: F-000          # ディレクトリ名 F-000-<slug> の ID 部と一致させる
 x-status: draft              # draft | fixed（fixed 化は起動元が行う。自分でしない）
-x-spec: ./spec.md            # 親 SSOT（機能詳細）
+x-spec: ./spec.md            # 振る舞い SSOT（目的・規則・GWT の正）
 x-updated: YYYY-MM-DD
 
 paths:
   /xxx:                      # 呼び出し口（REST でない場合はアクション名を path として表現）
     post:
       operationId: f000Xxx
-      summary: <何をするか 1 行>
+      summary: <何をするか 1 行>   # 1 行のみ。詳細説明は付けない
       security:
         - session: []        # 認証不要なら security: [] を明示
       requestBody:
@@ -28,7 +30,7 @@ paths:
                   type: string
                   minLength: 1
                   maxLength: 255
-                  description: <意味・制約>
+                  # description は wire 上の制約の短い注記のみ（業務意味・規則は spec）
             examples:
               ok:
                 value: { i_xxx: "abc" }
@@ -41,7 +43,7 @@ paths:
                 type: object
                 required: [id, status]
                 properties:
-                  id: { type: integer, description: 採番された ID }
+                  id: { type: integer }
                   status: { type: string, const: ok }
               examples:
                 ok:

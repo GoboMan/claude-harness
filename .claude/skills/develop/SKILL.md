@@ -84,13 +84,15 @@ description: システム開発（新機能・実装・修正・設計）を、A
 
 **1 機能 1 ディレクトリ**（`docs/specs/F-xxx-<slug>/`）に、その機能を実装するために読むべき文書を集約する。書式の SSOT はテンプレート（`.claude/templates/develop/`。producer と spec-lint が共有）。書き方の判断規則は各 producer の craft（agent body）が持つ。
 
+> **機能の MIS**: 各機能の SSOT は `spec.md`（振る舞い：意味・規則・GWT）＋ `api-contract.yaml`（境界の形：型・必須・enum・wire）の 2 ファイル。どちらか一方に全部を積まず、片方の説明をもう一方へコピーしない。分担の正は `ssot-definer` / `contract-author` の負のリスト。
+
 | 成果物 | 置き場所 | 書く主体 |
 | --- | --- | --- |
 | PRD（Why・スコープ・横断業務原則） | `docs/PRD.md` | 人間（🙋 orchestrator 代筆可） |
 | Design Doc（How の現在形） | `docs/design.md` | 人間（🙋 orchestrator 代筆可。理由は ADR へ） |
 | 機能一覧（台帳） | `docs/specs/specs.md` | `ssot-definer`／工程列は orchestrator |
-| 機能詳細 ＋ GWT | `docs/specs/F-xxx-<slug>/spec.md` | `ssot-definer` |
-| 処理インターフェース契約（OpenAPI 3.1） | `docs/specs/F-xxx-<slug>/api-contract.yaml` | `contract-author` |
+| 機能詳細（振る舞い）＋ GWT | `docs/specs/F-xxx-<slug>/spec.md` | `ssot-definer` |
+| 処理インターフェース契約（境界の形・OpenAPI 3.1） | `docs/specs/F-xxx-<slug>/api-contract.yaml` | `contract-author` |
 | 契約の共有語彙（`$ref` 先） | `docs/specs/_shared/components.yaml` | **orchestrator のみ**（producer は追加要望を報告で返す） |
 | DB 設計 | **framework／project が定める住所・書式**（§6。無ければ `docs/db/schema.md` にドラフト） | `db-designer` ＋ framework 規約 |
 | ADR | `docs/adr/NNNN-YYYY-MM-DD-title.md` | `adr-writer` |
