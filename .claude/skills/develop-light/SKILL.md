@@ -130,7 +130,7 @@ description: 小規模な単一スライス（標準 CRUD 等）を、本線 /de
 
 ## 7. Agent 配線
 
-人格の SSOT は `.claude/agents/develop/<name>.md`。ミッション本文をここに複製しない。全 Task に共通語彙パス（`specs.md`・`_shared/components.yaml` 等）を渡す。
+人格の SSOT は `.claude/agents/develop/<name>.md`。ミッション本文をここに複製しない。全 Task に共通語彙パス（`specs.md`・`_shared/components.yaml` 等）を渡す。成果物のパス渡し（本文を Task に貼らない）と Cursor での Task 起動時 model 選択は本線 develop skill §5 に従う。
 
 | Agent | 局面 | Task 入力 | 出口 |
 | --- | --- | --- | --- |
