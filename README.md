@@ -34,6 +34,7 @@ AI（特に Claude）の**ベースライン・コンテキストをゼロに保
    例) crow3_* 配下を触る          → web/crow/{common,frontend,backend}/*.md が載る
        next.config / app/**/page.tsx 等 → web/next/{common,frontend,backend}/*.md が載る
        *.tsx / *.ts を触る          → native/expo/{common,frontend}/*.md が載る
+       *.swift を触る               → native/swiftui/{common,frontend}/*.md が載る
 
 ② skill エントリ … 手続きは skill として description 自動起動 or /name 明示起動
    例) 「開発したい」/develop → develop skill に orchestrator の核・実行台本が丸ごと載る
@@ -96,14 +97,24 @@ claude-harness/
       │    │    │              ├── coding.md #          4 役割・Actions / 縁の検証
       │    │    │              └── testing.md #         ドメイン優先・境界モック・縁は薄く
       │    │    ├── native/                #     📱 プラットフォーム: モバイルネイティブ
-      │    │    │    └── expo/             #       📦 framework: Expo（expo-router / React Native）
+      │    │    │    ├── expo/             #       📦 framework: Expo（expo-router / React Native）
+      │    │    │    │    ├── common/      #         🔗 全レイヤ共通
+      │    │    │    │    │    ├── coding.md #          TS の共通則・秘密と依存の境界
+      │    │    │    │    │    └── testing.md #         ランナー契約（jest-expo）・決定性
+      │    │    │    │    └── frontend/    #         🎨 アプリ本体（RN アプリ＝frontend レイヤ）
+      │    │    │    │         ├── coding.md #          RN は Web ではない（表面の差分）
+      │    │    │    │         ├── routing.md #         expo-router の住所と遷移
+      │    │    │    │         ├── dataflow.md #        サーバ状態/クライアント状態・単一方向
+      │    │    │    │         ├── components.md #      粒度と UI/ロジック実装体の分担
+      │    │    │    │         └── （frontend/testing.md は当面置かない）
+      │    │    │    └── swiftui/          #       📦 framework: SwiftUI（ネイティブ iOS）
       │    │    │         ├── common/      #         🔗 全レイヤ共通
-      │    │    │         │    ├── coding.md #          TS の共通則・秘密と依存の境界
-      │    │    │         │    └── testing.md #         ランナー契約（jest-expo）・決定性
-      │    │    │         └── frontend/    #         🎨 アプリ本体（RN アプリ＝frontend レイヤ）
-      │    │    │              ├── coding.md #          RN は Web ではない（表面の差分）
-      │    │    │              ├── routing.md #         expo-router の住所と遷移
-      │    │    │              ├── dataflow.md #        サーバ状態/クライアント状態・単一方向
+      │    │    │         │    ├── coding.md #          Feature-first・MainActor・秘密と依存
+      │    │    │         │    └── testing.md #         ランナー契約・UseCase 主戦場・スイート分離
+      │    │    │         └── frontend/    #         🎨 アプリ本体（SwiftUI アプリ＝frontend レイヤ）
+      │    │    │              ├── coding.md #          View 表面（body・リスト・Preview・縁）
+      │    │    │              ├── routing.md #         Feature Router（NavigationStack）
+      │    │    │              ├── dataflow.md #        CA・Observation・UseCase/Repository
       │    │    │              ├── components.md #      粒度と UI/ロジック実装体の分担
       │    │    │              └── （frontend/testing.md は当面置かない）
       │    │
