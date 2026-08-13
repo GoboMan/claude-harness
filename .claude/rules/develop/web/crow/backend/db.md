@@ -1,6 +1,6 @@
 ---
 paths:
-  - "**/crow3_*/**"
+  - "**/crow3_*/**/db_design.txt"
 ---
 
 # 🗄️ crow / backend — DB 設計の書式と住所（`db_design.txt`）

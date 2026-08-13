@@ -135,7 +135,7 @@ description: 小規模な単一スライス（標準 CRUD 等）を、本線 /de
 | Agent | 局面 | Task 入力 | 出口 |
 | --- | --- | --- | --- |
 | `ssot-definer` | P1 | 1 機能スコープ、既存 SSOT パス（更新時） | 🙋 |
-| `db-designer` | P3（変更時のみ） | SSOT、既存スキーマ、FW の `db.md` パス（あれば） | 🙋 |
+| `db-designer` | P3（変更時のみ） | SSOT、既存スキーマ、FW の DB 設計規約のパス（あれば） | 🙋 |
 | `contract-author` | P3 | 確定 SSOT、確定 DB（あれば）、共通語彙パス | 🤖 |
 | `test-designer` | P4 前 | GWT、契約、**担当トラック=`backend処理`**、FW テスト規約パス（BE 束） | 🤖 ×1（BE のみ） |
 | `frontend-ui-implementer` | P4 FE-1 | SSOT、契約 response、FW 規約パス（**UI Red は渡さない**） | 🙋 |
@@ -159,7 +159,7 @@ description: 小規模な単一スライス（標準 CRUD 等）を、本線 /de
 
 ## 8. FW 固有規約（パス渡し）
 
-規約葉はインライン展開せず、Task 入力へ**パス渡し**する。束の組成・ファイル名→渡し先の正本は本線 develop skill §6-A／§6-B に従う（ここへコピペしない）。対象 FW を判定し、該当葉のパスを各 producer に渡す。
+規約葉はインライン展開せず、Task 入力へ**パス渡し**する。束の組成・宛先の決め方の正本は本線 develop skill §6-A／§6-B に従う（ここへコピペしない）。対象 FW を判定し、該当葉のパスを各 producer に渡す。
 
 ## 9. 完了条件（light）
 

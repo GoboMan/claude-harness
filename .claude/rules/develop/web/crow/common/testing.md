@@ -1,6 +1,7 @@
 ---
 paths:
-  - "**/crow3_*/**"
+  - "**/crow3_*/tests/**"
+  - "**/crow3_*/phpunit.xml*"
 ---
 
 # 🧪 crow — テストの共通則（全レイヤ）
@@ -32,7 +33,7 @@ crow には **(A) `engine/kernel/` のフレームワーク本体**と **(B) `db
 - **GWT が enum 値や日時入力に触れていても**、検証するのは「その入力を受けた**手書きロジック／ゲート**がどう振る舞うか」であって、`get_<field>_map()` や `crow_db_table_model::input_from_request()` の正しさではない
 - アプリが kernel の都合に合わせて書くときも、**SUT は app 側**に置く。kernel の実測を固定する「engine 特性化テスト」は develop の Red 対象外（framework 本体のテストは crow 本体／別リポジトリの責務）
 - 既存スイートに kernel／生成面のテストがあっても、**手本にして増やさない**
-- 生成メンバの列挙は [backend/coding.md](../backend/coding.md) の「生成済みメンバを再定義しない」に従う。レイヤ固有の切り方は [backend/testing.md](../backend/testing.md)
+- 生成メンバの列挙は [backend/model.md](../backend/model.md) §3.6 の「生成済みメンバを再定義しない」に従う。レイヤ固有の切り方は [backend/testing.md](../backend/testing.md)
 
 ## 1 テスト = 1 振る舞い
 

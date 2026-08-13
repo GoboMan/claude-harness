@@ -1,6 +1,9 @@
 ---
 paths:
-  - "**/crow3_*/**"
+  - "**/crow3_*/app/viewparts/**"
+  - "**/crow3_*/app/views/**"
+  - "**/crow3_*/app/assets/css/**"
+  - "**/crow3_*/app/assets/js/**"
 ---
 
 # 🧱 crow / frontend — コンポーネントの粒度と再利用
@@ -235,7 +238,7 @@ scene / root  ──▶  feature  ──▶  parts  ──▶  ui
 ## 9. backend（action / model）との境界
 
 FE 内の層分け（§1–§3）に加え、**サーバ側の責務**との線を守る。
-backend の正本は [backend/coding.md](../backend/coding.md)（action = ユースケース、model = Domain）。
+backend の正本は [backend/coding.md](../backend/coding.md) §1.1（境界）・[backend/action.md](../backend/action.md)（action = ユースケース）・[backend/model.md](../backend/model.md)（model = Domain）。
 
 ### 9.1 だれが何を持つか
 
@@ -250,7 +253,7 @@ backend の正本は [backend/coding.md](../backend/coding.md)（action = ユー
 | リクエストボディの組み立て | **feature** | 契約のキー／型に沿う。ui / parts は props で値を上げるだけ |
 | `exit_ng` 等のエラー文言 | **サーバが正。feature は提示** | 業務意味を FE で言い換え・握りつぶししない |
 
-backend 正本は [backend/coding.md](../backend/coding.md) §1・§2・§3.11。
+backend 正本は [backend/coding.md](../backend/coding.md) §1・[backend/action.md](../backend/action.md) §2・[backend/model.md](../backend/model.md) §3.11。
 **契約に載った共有表示値は FE で再導出せず使う。載せない画面固有のラベル／見せ方だけ FE。**
 
 ### 9.2 通信してよい層

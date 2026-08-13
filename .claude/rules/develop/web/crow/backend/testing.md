@@ -1,6 +1,7 @@
 ---
 paths:
-  - "**/crow3_*/**"
+  - "**/crow3_*/tests/**"
+  - "**/crow3_*/phpunit.xml*"
 ---
 
 # 🧪 crow / backend — テスト設計（PHPUnit）
@@ -21,7 +22,16 @@ paths:
 
 - `app/classes/_common_/model_<table>.php` に**自分で定義した**インスタンス／static メソッド
 - 拡張フック（`validation_crow_ext()` / `save_crow_ext()` / `trash_crow_ext()` / `delete_crow_ext()`）
+- `app/classes/_common_/model_<table>_<table>_service.php`（複数表にまたがる業務判定。[backend/model.md](./model.md) §3.12）
+  および `model_<table>_presenter.php` の手書きメソッド
 - `module_*` の `action_*` および、どのテーブルにも属さない手書きユーティリティ（例: `modifier` の独自ヘルパ）
+
+> action から呼ばれる側（model / service / presenter / util）は [backend/coding.md](./coding.md) §1.1 により
+> **リクエストを終了させず、`crow::get_hdb()` / `crow_request` を自分で呼ばない**ので、
+> 行オブジェクト・配列・（要るなら）モックした `$hdb` を**引数で渡すだけ**で Red が書ける（下記「crow の境界を差し替える」）。
+> **グローバル状態やスーパーグローバルを差し替えないとテストが書けない**、
+> **SUT が途中で exit してテストが完走しない**——このどちらかなら、それは実装側の [backend/coding.md](./coding.md) §1.1 違反である。
+> テストを捻じ曲げて通すのではなく、実装の欠陥として報告する。
 
 **Red にしない（1）— `engine/kernel/**`**
 
@@ -33,7 +43,7 @@ SUT が crow 本体であるテストは起こさない。例:
 
 **Red にしない（2）— crow が差し込む生成メンバ**
 
-[backend/coding.md](./coding.md) の「生成済みメンバを再定義しない」と同じ集合。例:
+[backend/model.md](./model.md) §3.6 の「生成済みメンバを再定義しない」と同じ集合。例:
 
 - フィールド本体、`m_table_name` / `table_name` / `primary_key`
 - `sql_select_all()` / `sql_select_one()`（定型クエリを別名で生やした手書きメソッドは対象）

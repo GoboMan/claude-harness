@@ -1,10 +1,11 @@
 ---
 paths:
-  - "**/*.tsx"
-  - "**/*.ts"
-  - "**/app.json"
-  - "**/app.config.*"
-  - "**/eas.json"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - "**/__tests__/**"
+  - "**/jest.config.*"
 ---
 
 # 🧪 Expo — テストの共通則（全レイヤ）

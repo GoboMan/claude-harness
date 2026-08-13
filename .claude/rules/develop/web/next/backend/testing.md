@@ -1,18 +1,10 @@
 ---
 paths:
-  - "**/next.config.*"
-  - "**/app/**/route.ts"
-  - "**/app/**/route.tsx"
-  - "**/app/**/actions.ts"
-  - "**/app/**/actions.tsx"
-  - "**/actions/**/*.ts"
-  - "**/actions/**/*.tsx"
-  - "**/domain/**"
-  - "**/infrastructure/**"
-  - "**/use-cases/**"
-  - "**/usecases/**"
-  - "**/*.{test,spec}.{ts,tsx}"
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
   - "**/__tests__/**"
+  - "**/vitest.config.*"
+  - "**/jest.config.*"
 ---
 
 # 🧪 Next.js / backend — テスト設計

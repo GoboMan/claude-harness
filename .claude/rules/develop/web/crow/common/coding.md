@@ -11,7 +11,7 @@ paths:
 >
 > 本書は **PHP / JS / CSS / HTML のすべてに効く共通スタイル**を扱い、
 > frontend / backend のどちらを書くときも従う。レイヤ固有の上乗せは
-> [frontend/coding.md](../frontend/coding.md) ／ [backend/coding.md](../backend/coding.md) にある。
+> [frontend/coding.md](../frontend/coding.md) ／ backend 側の葉（[coding.md](../backend/coding.md)＝境界の核・[action.md](../backend/action.md)・[model.md](../backend/model.md)・[query.md](../backend/query.md)）にある。
 > **共通ルールをレイヤ側へ写さないこと**（SSOT はここ 1 箇所）。
 
 > **注記:** 以下のコード例は構造（ブロックの揃え方など）を示すもの。実インデントは下表の通り **TAB** を使う（例中は表示の都合で見やすく整形している）。

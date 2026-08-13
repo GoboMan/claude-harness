@@ -1,7 +1,9 @@
 ---
 paths:
-  - "**/*.swift"
-  - "**/Package.swift"
+  - "**/*Tests.swift"
+  - "**/*Test.swift"
+  - "**/*Tests/**"
+  - "**/*Spec.swift"
 ---
 
 # 🧪 SwiftUI — テストの共通則（全レイヤ）

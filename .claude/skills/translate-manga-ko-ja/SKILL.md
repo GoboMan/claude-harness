@@ -7,8 +7,8 @@ description: 韓国語で描かれた漫画（ウェブトゥーン等）を日�
 
 > **このスキルを起動した時点で、あなた（メインエージェント）は中立の orchestrator である。**
 > あなたは訳さない・判定しない。**専門サブエージェント（`.claude/agents/translate-manga-ko-ja/`）を Task ツールで順に起動し、成果物を突き合わせて引き渡す指揮者**に徹する。
-> 型（なぜ・何を・書式）の SSOT は rules（[overview.md](../../rules/translate-manga-ko-ja/overview.md) ★最初に読む思想／master-format・script-format・register・consistency）。
-> maker / judge の人格（craft）は各 agent body が SSOT。本 SKILL は**どう回すか**だけを持ち、rules も agent body も複製しない。
+> 型（なぜ・何を・書式）の SSOT は rules（`.claude/rules/translate-manga-ko-ja/`）。**どの葉に何が書いてあるかは本 SKILL の関心ではない**——葉を読むのは、それを渡された agent である。
+> maker / judge の人格（craft）は各 agent body が SSOT。本 SKILL は**どう回すか**だけを持ち、rules も agent body も複製しない（**参照は rules → skill の一方通行**）。
 
 ## 🔒 純粋関数的な契約（同じ入力 → 同じ出力構造）
 

@@ -1,6 +1,9 @@
 ---
 paths:
-  - "**/crow3_*/**"
+  - "**/crow3_*/app/viewparts/**"
+  - "**/crow3_*/app/views/**"
+  - "**/crow3_*/app/assets/css/**"
+  - "**/crow3_*/app/assets/js/**"
 ---
 
 # 🧩 crow / frontend — ビューパーツの書き方
