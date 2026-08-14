@@ -53,6 +53,7 @@
 ### 3.1 葉（rules）を足す
 
 1. 階層を決める: `rules/<scene>/<platform>/<framework>/<concern>.md`（例: `develop/web/crow/common/coding.md`）。framework の中でレイヤ（`common` / `frontend` / `backend`）に分かれるなら、その 1 段を挟んでよい（深いほど具体的）。**レイヤ側の葉は共通側への差分だけを持ち、共通ルールを写さない。**
+   platform／framework 層を持つ scene（`develop` 等）では、**全 platform・全 framework に等しく効く関心事に限り scene 直下（`rules/<scene>/<concern>.md`）に置いてよい**（例: コード内コメントの規約）。platform 層を持たない scene（`translate-manga-ko-ja` 等）は直下がそのまま葉の住所である。この位置の葉は develop skill §6-A が framework 判定と無関係に必ず列挙するので、**`paths:` の被覆が落ちるとその葉だけ配送されなくなる**——framework を足したら被覆も更新する。それ以外を直下に置かない。
 
 **ファイル名は人間向けの目印にすぎない。配送先を決めるのは `paths:` である。**
 何をどう分割し何と名付けるかは rules 側の自由で、develop skill はファイル名の意味を知らない（§1 一方通行）。

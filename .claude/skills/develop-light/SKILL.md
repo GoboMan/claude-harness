@@ -100,7 +100,7 @@ description: 小規模な単一スライス（標準 CRUD 等）を、本線 /de
    - FE は **逐次**: 契約 `fixed` 後に `frontend-ui-implementer`（🙋 人間一瞥。UI Red は渡さない）→ 承認後に `frontend-logic-implementer`（🤖。FE Red は渡さない）
    - 4a-1 は test-designer と**並行してよい**。BE は FE の ui と**並行してよい**（書き込み先が交差しなければ）
 3. 結合の専任工程は置かない（本線と同じ。機械オラクルは BE。FE 穴は人間一瞥＋ `slice-reviewer`）。
-4. FE／BE 実装が揃ったら **`slice-reviewer`** を起動。欠陥ゼロまで反復（サーキットブレーカーは §6）。**attacker は起動しない。**
+4. FE／BE 実装が揃ったら（排他のため未実行の検証があれば先に集約実行して赤緑を確定してから）**`slice-reviewer`** を起動。欠陥ゼロまで反復（サーキットブレーカーは §6）。**attacker は起動しない。**
 5. 契約を変えたくなったら実装を止め Phase3 へ戻る。適格を破る変更なら本線へエスカレーション。
 
 ### 検証・完了
@@ -131,6 +131,8 @@ description: 小規模な単一スライス（標準 CRUD 等）を、本線 /de
 ## 7. Agent 配線
 
 人格の SSOT は `.claude/agents/develop/<name>.md`。ミッション本文をここに複製しない。全 Task に共通語彙パス（`specs.md`・`_shared/components.yaml` 等）を渡す。成果物のパス渡し（本文を Task に貼らない）と Cursor での Task 起動時 model 選択は本線 develop skill §5 に従う。
+
+**並列が既定・直列は例外**: 依存の無い Task は必ず同時起動する。並行可否・発行の仕方・排他リソースの扱いは本線 develop skill §4 が正（**排他のため実行を見送ったと報告されたら、並行区間を閉じて 1 体に集約実行させ、赤緑を確定してから検証へ進む**）。
 
 | Agent | 局面 | Task 入力 | 出口 |
 | --- | --- | --- | --- |

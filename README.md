@@ -12,7 +12,7 @@ AI（特に Claude）の**ベースライン・コンテキストをゼロに保
 - **保守不能**: 1 ファイルが肥大化し、どこに何があるか誰も分からなくなる。
 - **トークンの浪費**: 使わないルールを毎回ロードする。
 
-そこで本リポジトリは、ルールを **「シーン → プラットフォーム → framework → 関心」** という階層に分解し、AI に **「今必要な葉ノードだけ」** をロードさせます。**常駐する目次（カタログ）すら持ちません。**
+そこで本リポジトリは、ルールを **「シーン → プラットフォーム → framework → 関心」** という階層に分解し（全 platform に効く関心事だけシーン直下に置き）、AI に **「今必要な葉ノードだけ」** をロードさせます。**常駐する目次（カタログ）すら持ちません。**
 
 ## 🧭 統治ルール（この構造の唯一の原則）
 
@@ -49,7 +49,7 @@ AI（特に Claude）の**ベースライン・コンテキストをゼロに保
 
 | 要素 | 例 | 役割 | ロード契機 |
 | --- | --- | --- | --- |
-| 📦 ケース（葉） | `.../<framework>/*.md` | 実ルール（規約・思想） | `paths` にマッチしたファイルを触った時 |
+| 📦 ケース（葉） | `.../<framework>/*.md`（全 platform に効くものは `<scene>/*.md`） | 実ルール（規約・思想） | `paths` にマッチしたファイルを触った時 |
 | 🧬 producer craft | `agents/develop/ssot-definer.md` の書式節 | 成果物の書式 SSOT | 当該サブエージェント spawn 時のみ |
 | 🛠️ スキル | `.claude/skills/<name>/SKILL.md` | 手続きの入口（develop は orchestrator の判断核・実行台本を内包） | `description` で自動／`/name` で明示 |
 | 🤖 エージェント | `.claude/agents/develop/<name>.md` | 専門サブエージェントの人格 | orchestrator が Task 起動する時 |
@@ -68,6 +68,7 @@ claude-harness/
       │
       ├── rules/                           # 📦 葉のみ。目次(index.md)は持たない
       │    ├── develop/                    #   🎬 シーン: システム開発（旧 engineering）※判断核・台本は develop skill 内
+      │    │    ├── comments.md            #     💬 scene 共通則: コード内コメント（全 platform に効く）
       │    │    ├── web/                   #     🖥️ プラットフォーム: Web（builder 規約）
       │    │    │    ├── crow/             #       📦 framework: crow（PHP独自FW）
       │    │    │    │    ├── common/      #         🔗 全レイヤ共通
@@ -273,7 +274,7 @@ harness は**汎用ルールと検証ツールだけ**を持ち、案件固有�
 
 新しいルールを足すときは「葉を生やして `paths` を付ける」だけです。目次への追記は要りません。
 
-1. 適切な階層にケース Markdown を追加（例: `web/crow/backend/coding.md`、新 framework なら `web/laravel/coding.md`）。
+1. 適切な階層にケース Markdown を追加（例: `web/crow/backend/coding.md`、新 framework なら `web/laravel/coding.md`。全 platform に等しく効く関心事だけ scene 直下 `develop/*.md`）。
 2. その葉の frontmatter に `paths:`（発火するファイルの glob）を書く。手続きが要るなら skill を足す。
 3. 完了。**常駐する目次が無いので、他ファイルの書き換えは不要。**
 

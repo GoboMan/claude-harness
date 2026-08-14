@@ -15,7 +15,8 @@ paths:
 > [frontend/dataflow.md](../frontend/dataflow.md)、画面遷移は
 > [frontend/routing.md](../frontend/routing.md)、粒度と分担は
 > [frontend/components.md](../frontend/components.md)。テスト配線は
-> [testing.md](./testing.md)。
+> [testing.md](./testing.md)、テストの実行タイミングは
+> [test-execution.md](./test-execution.md)。
 > **共通則をレイヤ側へ写さないこと**（SSOT はここ 1 箇所）。
 
 ---
