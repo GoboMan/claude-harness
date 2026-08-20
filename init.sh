@@ -294,6 +294,11 @@ do_install()
   log "done."
   log "next: open the project; the AI routes via skills (/develop など). rules load on-demand (常駐なし)."
   log "      start development with the 'develop' skill (/develop)."
+  log ""
+  log "recommended (opt-in): enable the gate-hook so the §2 実装着手ゲート becomes a hard stop."
+  log "      未設定でも develop は成立するが、着手ゲートは AI の自己申告だけになる。"
+  log "      設置手順: .claude/tools/gate-hook/README.md 「設置」"
+  log "      要点: .claude/settings.local.json に PreToolUse フックを追記し、--code に実装コードの glob を渡す。"
   if [[ "${MODE}" == "submodule" ]]; then
     log "      commit the placement, then pull updates later with: ./init.sh update ${TARGET_DIR}"
   fi
