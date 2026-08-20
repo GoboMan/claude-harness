@@ -1,23 +1,24 @@
-# 処理インターフェース契約（OpenAPI 3.1）— 1 機能 1 ファイル
-# 同ディレクトリの spec.md と合わせて機能の MIS（境界の形だけを持つ。振る舞い・規則は spec）
-# プレースホルダ（F-000 / YYYY-MM-DD / <...>）は fixed 化前に必ず実値へ置換する
-# info.description / operation.description に目的・業務ルール・UI 説明を書かない（→ spec.md）
+# Interface contract (OpenAPI 3.1) — one feature, one file
+# With spec.md in the same directory this forms the feature's MIS (holds only the shape of the boundary; behavior and rules live in the spec)
+# Placeholders (F-000 / YYYY-MM-DD / <...>) must be replaced with real values before it is marked fixed
+# Never write purpose, business rules, or UI explanations into info.description / operation.description (→ spec.md)
+# Write summary and description text in Japanese
 openapi: 3.1.0
 info:
   title: F-000 <機能名>
   version: 1.0.0
-x-feature-id: F-000          # ディレクトリ名 F-000-<slug> の ID 部と一致させる
-x-status: draft              # draft | fixed（fixed 化は起動元が行う。自分でしない）
-x-spec: ./spec.md            # 振る舞い SSOT（目的・規則・GWT の正）
+x-feature-id: F-000          # must match the ID part of the directory name F-000-<slug>
+x-status: draft              # draft | fixed (the caller marks it fixed; never do it yourself)
+x-spec: ./spec.md            # the behavioral SSOT (authoritative for purpose, rules, and GWT)
 x-updated: YYYY-MM-DD
 
 paths:
-  /xxx:                      # 呼び出し口（REST でない場合はアクション名を path として表現）
+  /xxx:                      # the call site (for non-REST, express the action name as a path)
     post:
       operationId: f000Xxx
-      summary: <何をするか 1 行>   # 1 行のみ。詳細説明は付けない
+      summary: <何をするか 1 行>   # one line only; no detailed explanation
       security:
-        - session: []        # 認証不要なら security: [] を明示
+        - session: []        # state security: [] explicitly when no auth is required
       requestBody:
         required: true
         content:
@@ -30,7 +31,7 @@ paths:
                   type: string
                   minLength: 1
                   maxLength: 255
-                  # description は wire 上の制約の短い注記のみ（業務意味・規則は spec）
+                  # description is a short note on the wire constraint only (business meaning and rules live in the spec)
             examples:
               ok:
                 value: { i_xxx: "abc" }
@@ -66,5 +67,5 @@ paths:
 
 components:
   securitySchemes:
-    session:                 # security で使う名前は同一ファイルに要定義。実体は _shared を参照
+    session:                 # the name used in security must be defined in this file; the definition itself is referenced from _shared
       $ref: "../_shared/components.yaml#/components/securitySchemes/session"

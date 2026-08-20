@@ -1,41 +1,45 @@
-# gate-hook — §2 実装着手ゲートの機械強制（任意有効化）
+# gate-hook — machine enforcement of the §2 implementation start gate (opt-in)
 
-develop skill の **§2 実装着手ゲート**（spec と契約が `fixed` になる前に実装コードを書かない）を、
-Claude Code の **PreToolUse フック**として構造的に強制するツール。
+A tool that structurally enforces the develop skill's **§2 implementation start gate** (never write
+implementation code before the spec and the contract are `fixed`) as a Claude Code **PreToolUse hook**.
 
-- **無くても develop プロセスは成立する**（§2 は自己確認、spec-lint gate は commit 時の事後チェック）。
-  本フックはその二重の網に「**書き込みの瞬間に物理的に止まる停止線**」を追加する第三の網である。
-- **有効化は取り込み先プロジェクトの任意**。harness はスクリプトと本手順だけを同梱する
-  （設置＝settings への配線は各プロジェクトの責務。README「同梱する機械チェック」の項参照）。
+- **The develop process works without it** (§2 is a self-check, and the spec-lint gate is a post-hoc
+  check at commit time). This hook adds a third net to those two: **a stop line that physically halts
+  at the moment of writing**.
+- **Enabling it is up to the host project.** The harness bundles only the script and these
+  instructions (installation — the wiring into settings — is each project's responsibility; see the
+  "bundled machine checks" section of the README).
 
-## 仕組み
+## How it works
 
-1. Write / Edit / NotebookEdit の直前にフックが発火し、対象パスを受け取る。
-2. 対象が「実装コード」（`--code` glob にマッチ）なら、`docs/specs/specs.md` の台帳を読む。
-3. **工程=実装（または 検証）の全機能**について、spec と契約が `fixed` かを検証する。
-4. 欠けていれば **exit 2 でツール実行をブロック**し、理由（どの機能の何が未充足か・戻り先 Phase）を
-   stderr で AI に差し戻す。AI の意思と無関係に止まる。
+1. The hook fires immediately before Write / Edit / NotebookEdit and receives the target path.
+2. If the target is "implementation code" (it matches a `--code` glob), it reads the ledger at `docs/specs/specs.md`.
+3. It verifies, **for every feature whose phase is 実装 (implement) or 検証 (verify)**, that the spec and the contract are `fixed`.
+4. If anything is missing it **blocks the tool call with exit 2** and sends the reason (which feature is missing what, and the return-point phase) back to the AI on stderr. This halts regardless of the AI's intent.
 
-台帳（specs.md の工程列）を機械可読なゲート状態として使うため、**追加の状態ファイルは無い**。
-orchestrator が SKILL の手順どおり台帳を更新していれば、そのままフックの判定材料になる。
+Because the ledger (the phase column in specs.md) is used as the machine-readable gate state, **there
+is no extra state file**. As long as the orchestrator updates the ledger per the SKILL's procedure,
+that is exactly what the hook judges from.
 
-### 判定規則
+### Decision rules
 
-| 書き込み対象 | 判定 |
+| Write target | Decision |
 | --- | --- |
-| `docs/` 配下（spec・契約・台帳） | 常に許可（SSOT を書く行為はゲートの前提） |
-| `.claude/` 配下・`--exclude` マッチ・`--code` 非マッチ | 許可（ゲート対象外） |
-| 実装コード ＋ 台帳 specs.md が無い | **ブロック**（SSOT が無い → Phase 1） |
-| 実装コード ＋ 工程=実装\|検証 の行が台帳に無い | **ブロック**（台帳を更新してから着手） |
-| 実装コード ＋ 実装中機能の spec / 契約が `fixed` でない・無い | **ブロック**（Phase 1 / Phase 3 へ） |
-| 上記すべて充足 | 許可 |
+| Under `docs/` (spec, contract, ledger) | Always allowed (writing the SSOT is the gate's precondition) |
+| Under `.claude/`, matching `--exclude`, or not matching `--code` | Allowed (outside the gate) |
+| Implementation code + no ledger specs.md | **Blocked** (no SSOT → Phase 1) |
+| Implementation code + no row with phase 実装\|検証 in the ledger | **Blocked** (update the ledger before starting) |
+| Implementation code + the in-progress feature's spec / contract not `fixed` or absent | **Blocked** (→ Phase 1 / Phase 3) |
+| All of the above satisfied | Allowed |
 
-フック自身の内部エラー（stdin 不正など）は **fail-open**（許可）— フックの不具合でセッションを壊さない。
-逆にゲート判定そのものは **fail-closed** — 台帳・SSOT が無ければ止まる。
+An internal error in the hook itself (malformed stdin and the like) **fails open** (allows) — a bug in
+the hook must not break the session. The gate decision itself, conversely, **fails closed** — with no
+ledger or SSOT, it halts.
 
-## 設置（取り込み先プロジェクトで）
+## Installation (in the host project)
 
-`.claude/settings.local.json`（個人・非コミット。submodule 配置でも取り込み先に閉じる）に追記する:
+Add this to `.claude/settings.local.json` (personal, uncommitted; stays within the host project even
+under a submodule placement):
 
 ```json
 {
@@ -55,37 +59,39 @@ orchestrator が SKILL の手順どおり台帳を更新していれば、その
 }
 ```
 
-チームで共有したい場合は、`.claude` を copy / symlink 配置しているなら `.claude/settings.json` に
-同じ内容を書いてよい（submodule 配置では settings.json が harness 側のファイルになるため不可。
-その場合は各自の settings.local.json に置く）。
+To share it with the team, you may put the same content in `.claude/settings.json` if `.claude` is
+placed by copy or symlink (not possible under a submodule placement, where settings.json is a
+harness-side file — in that case each person puts it in their own settings.local.json).
 
-### 引数（設定はすべてここ。設定ファイルは増やさない）
+### Arguments (all configuration lives here; no config file is added)
 
-| 引数 | 意味 |
+| Argument | Meaning |
 | --- | --- |
-| `--code <glob>` | ゲート対象＝実装コードとみなすパス（複数可・**必須**）。例: `'src/**'` `'app/**'` `'db/schema.*'` |
-| `--exclude <glob>` | `--code` の中から除外するパス（複数可）。例: skeleton の作業場 `'skeleton/**'` |
-| `--docs <dir>` | docs ルート（既定 `docs`） |
+| `--code <glob>` | Paths treated as implementation code, i.e. gated (repeatable, **required**). e.g. `'src/**'` `'app/**'` `'db/schema.*'` |
+| `--exclude <glob>` | Paths excluded from `--code` (repeatable). e.g. the skeleton's workspace `'skeleton/**'` |
+| `--docs <dir>` | The docs root (default `docs`) |
 
-- `--code` を渡さずに有効化すると、ブロックせず警告だけ出す（exit 1・設置ミスの検出用）。
-- glob は `**` / `*` / `?` のみの最小実装（プロジェクトルートからの相対パスにマッチ）。
+- Enabled without `--code`, it blocks nothing and only warns (exit 1 — for detecting a misinstallation).
+- The globs are a minimal implementation supporting only `**` / `*` / `?` (matched against paths relative to the project root).
 
-## 制約（知ったうえで使う）
+## Limits (use it knowing these)
 
-- **Bash 経由の書き込み（`sed -i`・リダイレクト等）は素通りする。** matcher が Write/Edit 系のみのため。
-  Bash まで塞ぐ設計は誤爆（ビルド・テスト実行の妨害）が大きく、意図的に対象外。
-- **メインエージェントとサブエージェントを区別しない。** 実装 producer の正当な Write も同じ判定を
-  通るが、正当な実装は台帳・spec・契約が揃っている状態でしか起きないため、追加の網として無害
-  （むしろ producer の逸脱も止める）。
-- **ウォーキングスケルトン**（§3。契約 fixed 前に振る舞いを書く明示的例外）は、本線のコードツリー外
-  （例: `skeleton/`）で作業させ `--exclude` で除外するか、ゲート対象 glob の外に置くこと。
-- 台帳の工程列・spec/契約のステータスが実態と drift していれば判定も drift する。整合は spec-lint
-  （`../spec-lint/`）が commit 時に裏取りする。
+- **Writes via Bash (`sed -i`, redirects, and so on) pass straight through**, because the matcher covers
+  only the Write/Edit family. A design that also blocks Bash misfires too often (obstructing builds and
+  test runs), so it is deliberately out of scope.
+- **It does not distinguish the main agent from subagents.** A legitimate Write by an implementation
+  producer passes the same check, but legitimate implementation only happens once the ledger, spec, and
+  contract are all in place, so the extra net is harmless (indeed it also stops a producer that strays).
+- **The walking skeleton** (§3; the explicit exception that writes behavior before the contract is fixed)
+  should work outside the mainline code tree (e.g. `skeleton/`) and be excluded with `--exclude`, or be
+  placed outside the gated globs.
+- If the ledger's phase column or a spec/contract status drifts from reality, the decision drifts with it.
+  spec-lint (`../spec-lint/`) confirms consistency at commit time.
 
-## 動作確認
+## Checking that it works
 
 ```bash
 echo '{"tool_input":{"file_path":"src/x.js"},"cwd":"/path/to/project"}' \
   | node .claude/tools/gate-hook/gate-hook.mjs --code 'src/**'
-echo $?   # 台帳・spec・契約が揃っていなければ 2（ブロック理由が stderr に出る）
+echo $?   # 2 unless the ledger, spec, and contract are all in place (the block reason goes to stderr)
 ```

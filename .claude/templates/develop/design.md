@@ -16,5 +16,6 @@
 ## 設計上の制約
 - （このプロジェクト固有の制約のみ。現在形）
 
-<!-- 書かないもの: 決定の理由・トレードオフ本文 → docs/adr/（ここからはリンク 1 行）
-     framework 汎用の規約 → .claude/rules（プロジェクト固有の選択だけをここに書く） -->
+<!-- Do not write here: the reasoning and trade-offs behind a decision → docs/adr/ (one link line from here)
+     Framework-generic rules → .claude/rules (write only this project's own choices here).
+     Write the content in Japanese. -->

@@ -1,5 +1,5 @@
 ---
-ステータス: draft        # draft | fixed（列挙の網羅が済んだら fixed）
+ステータス: draft        # draft | fixed (fixed once the enumeration is complete)
 更新日: YYYY-MM-DD
 ---
 
@@ -9,5 +9,7 @@
 | --- | --- | --- | --- | --- | --- |
 | F-001 | ログイン | メール＋パスワードで認証する | [F-001](./F-001-login/spec.md) | draft | 定義 |
 
-<!-- 状態 = 各 spec.md のステータスの写し（draft|fixed）
-     工程 = 進捗台帳（定義→構造→実装→検証→完了）。新規行は「定義」で初期化し、以後は orchestrator が更新。旧名「攻撃」は「検証」に読み替え -->
+<!-- 状態 = a copy of each spec.md's status (draft|fixed)
+     工程 = the progress ledger (定義→構造→実装→検証→完了). Initialize a new row at 定義;
+            from then on the orchestrator updates it. Read the old name 攻撃 as 検証.
+     Write the content in Japanese. -->

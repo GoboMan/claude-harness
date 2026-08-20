@@ -18,4 +18,6 @@
 ## 機能横断の業務原則
 - （全機能に効く原則のみ。例: 退会済ユーザーは全画面で不可視）
 
-<!-- 書かないもの: 機能別の受け入れ条件・GWT・入出力 → docs/specs/F-xxx-<slug>/spec.md が正 -->
+<!-- Do not write here: per-feature acceptance criteria, GWT, or inputs/outputs
+     → docs/specs/F-xxx-<slug>/spec.md is authoritative for those.
+     Write the content in Japanese. -->

@@ -1,18 +1,23 @@
-# templates/develop — docs 成果物のテンプレート（書式の SSOT）
+# templates/develop — templates for docs artifacts (the SSOT for format)
 
-各テンプレートは **producer（書く側）と spec-lint（検証する側）が共有する唯一の書式定義**。
-spec-lint は `spec.md` の必須セクション・必須フロントマターを本ディレクトリのテンプレートから導出するため、書式改定はテンプレートを直せば lint も追従する（二重化しない）。
+Each template is **the single format definition shared by the producer (who writes) and spec-lint
+(who verifies)**. spec-lint derives `spec.md`'s required sections and required frontmatter from the
+templates in this directory, so revising the format means editing the template and the lint follows
+(no duplication).
 
-| テンプレート | 生成先（取り込み先プロジェクト） | 書く主体 |
+| Template | Generated into (the host project) | Author |
 | --- | --- | --- |
-| `PRD.md` | `docs/PRD.md` | 人間（orchestrator 代筆可） |
-| `design.md` | `docs/design.md` | 人間（orchestrator 代筆可） |
-| `specs.md` | `docs/specs/specs.md`（台帳） | ssot-definer／工程列は orchestrator |
-| `spec.md` | `docs/specs/F-xxx-<slug>/spec.md`（振る舞い） | ssot-definer |
-| `api-contract.yaml` | `docs/specs/F-xxx-<slug>/api-contract.yaml`（境界の形） | contract-author |
+| `PRD.md` | `docs/PRD.md` | human (orchestrator may ghostwrite) |
+| `design.md` | `docs/design.md` | human (orchestrator may ghostwrite) |
+| `specs.md` | `docs/specs/specs.md` (the ledger) | ssot-definer; the phase column by the orchestrator |
+| `spec.md` | `docs/specs/F-xxx-<slug>/spec.md` (behavior) | ssot-definer |
+| `api-contract.yaml` | `docs/specs/F-xxx-<slug>/api-contract.yaml` (the shape of the boundary) | contract-author |
+| `components.yaml` | `docs/specs/_shared/components.yaml` | orchestrator only (producers report requests to add) |
 
-`spec.md` と `api-contract.yaml` は機能ディレクトリの MIS（2 ファイルで 1 機能の SSOT）。列・キーの形は本テンプレート、何を書かないかの判断は各 producer craft。
-| `components.yaml` | `docs/specs/_shared/components.yaml` | orchestrator のみ（producer は追加要望を報告） |
+`spec.md` and `api-contract.yaml` are a feature directory's MIS (two files forming one feature's SSOT).
+The shape of the columns and keys comes from these templates; the judgment of what not to write comes
+from each producer's craft.
 
-- プレースホルダ（`F-000`・`YYYY-MM-DD`・`<...>`）は `fixed` 化前に必ず実値へ置換する（spec-lint が検証）。
-- 書き方の判断規則（負のリスト・craft）はテンプレートに書かない。各 producer の agent body が持つ。
+- Placeholders (`F-000`, `YYYY-MM-DD`, `<...>`) must always be replaced with real values before something is marked `fixed` (spec-lint verifies this).
+- The judgment rules for how to write (the negative lists, the craft) are not written into templates. Each producer's agent body holds them.
+- **The generated artifacts are written in Japanese.** The templates carry Japanese headings and frontmatter keys for exactly that reason; the English text inside them is guidance for the producer and is not part of the artifact.

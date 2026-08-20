@@ -6,15 +6,18 @@
 ---
 
 <!--
-  このディレクトリの SSOT は spec.md ＋ api-contract.yaml の 2 ファイル（MIS）。
-  本ファイルは振る舞い（意味・規則・観測条件）。境界の形（型・必須・enum・wire）は契約へ。
+  This directory's SSOT is the pair spec.md + api-contract.yaml (the MIS).
+  This file holds behavior (meaning, rules, observable conditions). The shape of the
+  boundary (types, required-ness, enums, wire) goes to the contract.
 
-  この spec は 1 スライスで producer / oracle の 9 箇所が別コンテキストで全文を読む。
-  分量はそのまま全エージェントのコンテキスト＝コストになる。
+  This spec is read in full, in a separate context, at 9 points per slice
+  (every producer and oracle). Its volume is billed directly as context to all of them.
 
-  本体は「業務ルール」（規則）である。「受け入れ条件」は規則だけでは解釈が割れる
-  箇所に置く代表例であって、テストケースの一覧ではない。
-  ケースの網羅は test-designer の職務（規則 1 本 → テスト N 本が正常な比率）。
+  The substance of this file is the 業務ルール (rules). 受け入れ条件 are representative
+  examples placed where the rules alone admit divergent readings — not a list of test cases.
+  Exhausting the cases is test-designer's job (one rule → N tests is the healthy ratio).
+
+  Write the content in Japanese.
 -->
 
 ## 目的
@@ -25,16 +28,17 @@
 - 権限条件：
 
 ## 入力 (Input)
-<!-- 型・範囲・必須・列挙値は api-contract.yaml が持つ。ここに書き写さない。
-     受け付ける値の規則（1 以上の整数、等）は「業務ルール」に 1 文で書き、契約はそこから導出する -->
+<!-- Types, ranges, required-ness, and enumerated values live in api-contract.yaml. Do not transcribe them here.
+     Rules about accepted values ("an integer of 1 or more", etc.) go into 業務ルール as one sentence;
+     the contract is derived from there. -->
 
 | 名前 | 業務上の意味 |
 | --- | --- |
 | i_xxx | <この入力が業務上何を指すか> |
 
 ## 出力 (Output)
-<!-- 返す情報の種類と業務上の意味だけ。response の形は契約が持つ。
-     表示位置・装飾（余白・並び順・ラベル位置・色）は書かない -->
+<!-- Only the kinds of information returned and their business meaning. The response shape lives in the contract.
+     Do not write placement or decoration (spacing, ordering, label position, color). -->
 
 - 正常時：（利用者が受け取る情報・遷移先）
 - 契約：`./api-contract.yaml`
@@ -49,24 +53,27 @@
 - 境界：
 
 ## 業務ルール
-<!-- この機能の不変条件。ここが spec の本体であり、反証の根拠である。
-     1 規則 1 文で書き、下の 4 型のいずれかに当てはめる（組み合わせてもよい）。
-       恒常: 「<主体> は 常に <成り立つこと>。」
-       事象: 「<条件> のとき、<観測できる振る舞い>。」
-       状態: 「<状態> の間、<観測できる振る舞い>。」
-       異常: 「<異常条件> の場合、<観測できる振る舞い>。」
-     規則は無限の入力を 1 文で覆う。規則を満たす／満たさない値を列挙しない -->
+<!-- This feature's invariants. This is the substance of the spec and the grounds for refutation.
+     One rule per sentence, fitting one of the 4 patterns below (they may be combined):
+       常時 (always):    「<主体> は 常に <成り立つこと>。」
+       事象 (on event):  「<条件> のとき、<観測できる振る舞い>。」
+       状態 (while in):  「<状態> の間、<観測できる振る舞い>。」
+       異常 (on error):  「<異常条件> の場合、<観測できる振る舞い>。」
+     A rule covers infinite inputs in one sentence. Do not enumerate the values that
+     do or do not satisfy it. -->
 
 - <主体> は 常に <成り立つこと>。
 - <条件> のとき、<観測できる振る舞い>。
 
 ## 受け入れ条件 (GWT)
-<!-- 業務ルールだけでは解釈が割れる箇所にだけ、代表例を 1〜2 本置く。
-     規則の言い換え・値違いの列挙・ケースの網羅はここでやらない（test-designer の職務）。
-     「何が観測されたら誤りと分かるか」を判定できる粒度で書く -->
+<!-- Place 1-2 representative examples only where the rules alone admit divergent readings.
+     Do not paraphrase a rule, enumerate value variants, or sweep the cases here
+     (that is test-designer's job).
+     Write at a granularity that decides "what observation would prove this wrong". -->
 
 - **Given** …
   **When** …
   **Then** …
 
-<!-- 入力名の i_ 接頭辞は framework 規約に合わせた例。実装言語・framework の規約に従う -->
+<!-- The i_ prefix on input names is an example matching one framework's rules.
+     Follow the conventions of the implementation language and framework in use. -->

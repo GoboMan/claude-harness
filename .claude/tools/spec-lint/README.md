@@ -1,50 +1,52 @@
 # spec-lint
 
-docs SSOT（台帳・機能詳細・契約）のフォーマット / ライフサイクルを機械検証する、
-harness 同梱の依存ゼロ Node ツール。
+A zero-dependency Node tool bundled with the harness that mechanically verifies the format and
+lifecycle of the docs SSOT (the ledger, feature specs, contracts).
 
-- **検証対象のレイアウト**: `docs/specs/specs.md`（台帳）＋ `docs/specs/F-xxx-<slug>/`（`spec.md`・`api-contract.yaml`）＋ `docs/specs/_shared/components.yaml`。`docs/PRD.md`・`docs/design.md` があれば境界違反（PRD への GWT 混入等）も warn する
-- **検証対象の書式**: SSOT は `../../templates/develop/` のテンプレート。spec.md の必須セクション・必須フロントマター・契約の必須 `x-` キーは**テンプレートから導出**する（書式改定はテンプレートを直せば lint も追従。書き方の判断規則は各 producer craft が持つ）
-- **契約（OpenAPI 3.1）の検証範囲**: ライフサイクル（`x-status`）・ID 整合（ディレクトリ名 ↔ `x-feature-id`）・`x-spec`／`$ref` の参照解決・spec との突き合わせまで。**OpenAPI としての完全な構文検証は producer が `npx @redocly/cli lint` 等で行う**（依存ゼロを保つための分担）
-- **使い方**: producer（contract-author 等）が成果物を機械検証するために直接叩く。commit-msg フックに `gate` を挿す運用も可（各プロジェクト側で任意配線）
+- **The layout it verifies**: `docs/specs/specs.md` (the ledger) + `docs/specs/F-xxx-<slug>/` (`spec.md`, `api-contract.yaml`) + `docs/specs/_shared/components.yaml`. If `docs/PRD.md` / `docs/design.md` exist, it also warns on boundary violations (GWT leaking into the PRD, and the like)
+- **The format it verifies**: the SSOT is the templates in `../../templates/develop/`. The required sections and frontmatter of spec.md and the required `x-` keys of a contract are **derived from the templates** (revise the format by editing the template and the lint follows; the judgment rules for how to write are held by each producer's craft)
+- **Scope of contract (OpenAPI 3.1) verification**: the lifecycle (`x-status`), ID consistency (directory name ↔ `x-feature-id`), resolution of `x-spec` and `$ref`, and cross-checking against the spec. **Full OpenAPI syntax validation is the producer's job via `npx @redocly/cli lint` or similar** (a division of labor that keeps this tool dependency-free)
+- **How it is used**: producers (contract-author and others) invoke it directly to machine-verify their deliverables. Wiring `gate` into a commit-msg hook is also possible (optional, on each project's side)
 
 ```bash
-node spec-lint.mjs validate [--docs docs]     # フォーマット＋状態機械の不変条件＋docs 衛生
-node spec-lint.mjs gate --message <file>       # commit の Feature: トレーラを検証
-node spec-lint.mjs gate --feature F-001         # 指定機能の spec / 契約が fixed か
+node spec-lint.mjs validate [--docs docs]     # format + state-machine invariants + docs hygiene
+node spec-lint.mjs gate --message <file>       # verify a commit's Feature: trailer
+node spec-lint.mjs gate --feature F-001         # whether the given feature's spec / contract are fixed
 ```
 
-終了コード: `0`=OK / `1`=違反 / `2`=使い方エラー。Node のみ（外部依存なし）。
-旧レイアウト（`docs/spec` ＋ `docs/contracts`）を検出した場合は移行を促して `1` を返す。
+Exit codes: `0`=OK / `1`=violation / `2`=usage error. Node only (no external dependencies).
+On detecting the old layout (`docs/spec` + `docs/contracts`), it prompts for migration and returns `1`.
 
-## err にするもの（状態機械・参照の不変条件）
+## What it treats as an error (state-machine and reference invariants)
 
-- 必須フロントマター／必須セクション／必須 `x-` キーの欠落、`draft|fixed` 以外の状態
-- ディレクトリ名 `F-xxx-<slug>` 違反・機能ID の不一致・重複、`spec.md` の欠落
-- 台帳との不整合（列挙漏れ・リンク切れ・状態の食い違い）
-- 親 spec が `draft` なのに契約が `fixed`、`fixed` なのにプレースホルダ残存
-- `x-spec`／`$ref` の参照が解決しない
+- Missing required frontmatter / required sections / required `x-` keys; a status other than `draft|fixed`
+- Directory-name violations of `F-xxx-<slug>`, mismatched or duplicate feature IDs, a missing `spec.md`
+- Inconsistency with the ledger (missing entries, broken links, conflicting status)
+- A contract that is `fixed` while its parent spec is `draft`; placeholders left behind on something `fixed`
+- An `x-spec` or `$ref` reference that does not resolve
 
-## docs 衛生検出（すべて warn）
+## Docs-hygiene detection (all warnings)
 
-spec / 契約が「現在形の不変条件」から逸脱して情報堆積場になる兆候を warn で検出する
-（負のリストの SSOT は各 producer craft。ssot-definer / contract-author の「書かないもの」）:
+Warns on signs that a spec or contract is drifting from "present-tense invariants" into a dumping
+ground for information (the SSOT for the negative lists is each producer's craft — the "what must not
+be written" sections of ssot-definer / contract-author):
 
-| 検出 | 対象 | 意味 |
+| Detection | Target | What it means |
 | --- | --- | --- |
-| 冒頭 blockquote の堆積 | spec | 改訂経緯・差分ナラティブは commit message / ADR へ |
-| 本文中の日付括弧（`（2026-01-01` 等） | spec / 契約 | 経緯は git が持つ。本文は現在形に統合 |
-| 実装アンカー（コードのファイルパス。契約は行番号付きのみ） | spec / 契約 | コードが SSOT。docs に書くと腐る |
-| 内部 API 参照（`クラス::メソッド`） | spec | spec は観測可能な振る舞いの語彙で書く |
-| 「既知の課題／残存リスク／バックログ」セクション | spec | 未解決は issue 管理へ排出（fixed spec に未決を溜めない） |
-| 肥大（spec 12,000 文字超 / 契約 400 行超） | spec / 契約 | 1 関心事を超えた堆積の疑い。**spec は行数でなく文字数で測る**（1 行 1,000 文字の spec が「300 行」で閾値をすり抜けた実例があるため） |
-| 業務ルールが 30 本超 | spec | spec の本体（1 規則 1 文の不変条件）。過大なら機能が大きすぎる疑い |
-| 業務ルール 1 本が 150 文字超 | spec | 1 規則 1 文になっていない（複数の規則が 1 本に圧縮されている）。本数の上限だけでは段落化で迂回できるため長さも見る |
-| 受け入れ条件が 15 本超 | spec | 受け入れ条件は規則を補う代表例であって**テストケースの一覧ではない**（ケースの網羅は test-designer の職務。規則 1 本 → テスト N 本が正常な比率）。本数の膨張は規則の言い換え・値違いの列挙・欠陥ごとの 1 本追加の堆積 |
-| 他機能への参照が 20 件超 | spec | 参照先の振る舞いを複製している疑い。共有される振る舞いは所有機能の spec だけが持ち、他は参照 1 行に留める |
-| 入力表の型・必須・制約列 | spec | 型情報の正は契約。spec は「名前｜業務上の意味」のみ |
-| 業務ルール再掲の `x-*`（state-transition 等） | 契約 | 規則・判定順序は spec。契約は境界の形だけ |
-| 長い `description`（8 行超 / 200 字超） | 契約 | 目的・規則・UI 説明は spec。summary 1 行と短い注記のみ |
-| PRD に GWT／受け入れ条件 | PRD | 機能別の受け入れ条件は spec の関心事（境界違反） |
+| Accumulated blockquotes at the top | spec | Revision history and diff narrative belong in the commit message / ADR |
+| Dates in parentheses in the body (`（2026-01-01` and the like) | spec / contract | git holds the history. Integrate the body into the present tense |
+| Implementation anchors (code file paths; for contracts, only with line numbers) | spec / contract | The code is the SSOT. Written into docs, it rots |
+| Internal API references (`Class::method`) | spec | A spec is written in the vocabulary of observable behavior |
+| A "known issues / residual risks / backlog" section | spec | Open items are pushed out to issue tracking (never let them accumulate in a fixed spec) |
+| Bloat (a spec over 12,000 characters / a contract over 400 lines) | spec / contract | Suspected accumulation beyond one concern. **A spec is measured in characters, not lines** (a real case: a spec with 1,000-character lines slipped under the threshold at "300 lines") |
+| Over 30 business rules | spec | The substance of a spec (invariants, one rule per sentence). Too many suggests the feature is too large |
+| A single business rule over 150 characters | spec | It is not one rule per sentence (several rules compressed into one). A cap on the count alone can be dodged by paragraphing, so length is checked too |
+| Over 15 acceptance criteria | spec | Acceptance criteria are representative examples supplementing the rules, **not a list of test cases** (exhausting the cases is test-designer's job; one rule → N tests is the healthy ratio). A swelling count means paraphrased rules, enumerated value variants, or one line accumulated per defect |
+| Over 20 references to other features | spec | Suspected duplication of the referenced behavior. Shared behavior is held only by the owning feature's spec; the rest keep to a one-line reference |
+| Type, required, or constraint columns in the input table | spec | Type information is authoritative in the contract. A spec's inputs are "name \| business meaning" only |
+| `x-*` restating business rules (state-transition and the like) | contract | Rules and evaluation order belong to the spec. A contract holds only the shape of the boundary |
+| A long `description` (over 8 lines / over 200 characters) | contract | Purpose, rules, and UI explanations belong to the spec. Only a one-line summary and short notes here |
+| GWT / acceptance criteria in the PRD | PRD | Per-feature acceptance criteria are the spec's concern (a boundary violation) |
 
-err にしない理由: 既存プロジェクトの validate を即死させないため（浄化は差分更新の機会に順次）。
+Why these are not errors: so that an existing project's `validate` does not die instantly (cleanup happens
+progressively, at the opportunities differential updates provide).
