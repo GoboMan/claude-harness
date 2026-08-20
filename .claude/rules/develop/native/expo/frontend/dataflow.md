@@ -7,58 +7,60 @@ paths:
   - "**/eas.json"
 ---
 
-# 🔀 Expo / frontend — 状態とデータフロー
+# 🔀 Expo / frontend — state and data flow
 
-> **適用範囲: Expo (expo-router) の React Native アプリ。** Expo でなければ本書は適用外として読み捨てること。
+> **Scope: React Native apps on Expo (expo-router).** If it is not Expo, treat this document as inapplicable and discard it.
 >
-> 記法の共通則は [common/coding.md](../common/coding.md)、表面の規約は [coding.md](./coding.md)、
-> 画面の住所と遷移は [routing.md](./routing.md)。
-> 本書は**状態をどこに持ち、どう流すか**だけを定める。コンポーネントの粒度は [components.md](./components.md)。
+> The common notation rules are [common/coding.md](../common/coding.md); the surface rules are [coding.md](./coding.md);
+> where screens live and how navigation works is [routing.md](./routing.md).
+> This document defines only **where state is held and how it flows**. Component granularity is [components.md](./components.md).
+>
+> **Write comments and user-facing text in Japanese.**
 
 ---
 
-## 0. 到達点の定義（React が支えること・支えないこと）
+## 0. Defining the goal (what React does and does not support)
 
-React が保証するのは 2 つだけである。
+React guarantees only 2 things:
 
-1. state が変われば再レンダされる
-2. props は親から子への一方向である
+1. When state changes, it re-renders
+2. props are one-way, parent to child
 
-**キャッシュ・重複排除・再取得・キャンセル・失効・永続化・画面ライフサイクルは、React の守備範囲ではない。**
+**Caching, deduplication, refetching, cancellation, invalidation, persistence, and the screen lifecycle are outside React's remit.**
 
-ここが空いているので、実装は自然と `useEffect` + `useState` でそれを自前に埋めにいく。
-そして埋めた実装は、開発機の速い回線と 1 画面の操作では**正しく動いてしまう**。
-壊れるのは実機・低速回線・連打・画面を行き来したときであり、そこは検証が届きにくい。
+Because that space is empty, an implementation naturally goes to fill it by hand with `useEffect` + `useState`.
+And what it fills in **works correctly** on a dev machine's fast connection with a single screen's interactions.
+It breaks on a real device, on a slow connection, on rapid taps, and when moving between screens — exactly where verification does not reach.
 
-**本書の役目は、その自前実装を禁じて置き場を指定することにある。**
+**This document's job is to forbid that hand-rolled implementation and to name the place things go instead.**
 
 ---
 
-## 1. サーバ状態とクライアント状態は別のものである
+## 1. Server state and client state are different things
 
-| 種別 | 定義 | 置き場 |
+| Kind | Definition | Where it lives |
 | --- | --- | --- |
-| **サーバ状態** | サーバが真実を持ち、こちらは**複製を見ているだけ**の値（一覧・詳細・ユーザ情報） | **キャッシュを持つクエリ層**（既定 TanStack Query） |
-| **クライアント状態** | このアプリの中だけで生まれ、サーバが知らない値（モーダルの開閉・入力途中・選択・タブ位置） | コンポーネントの `useState`、共有が要るなら軽量ストア |
+| **Server state** | values whose truth the server holds and of which we **only see a copy** (lists, details, user info) | **a query layer with a cache** (TanStack Query by default) |
+| **Client state** | values born only inside this app that the server does not know about (a modal's open/closed, in-progress input, a selection, the current tab) | a component's `useState`; a lightweight store if sharing is needed |
 
-**どちらに属するか判断できない値が出たら、そこが設計の曖昧な箇所である。**
-その値の真実を誰が持っているかを先に決める。
+**A value you cannot decide between is exactly where the design is ambiguous.**
+Decide first who holds that value's truth.
 
-> **ライブラリの既定は TanStack Query とする。**
-> 別の選択をするプロジェクトは、**そのプロジェクトの `CLAUDE.md` に宣言する**（harness 側では固定しない）。
-> ただし「キャッシュ層を置かない」という選択は §2 と両立しないので取れない。
+> **The default library is TanStack Query.**
+> A project choosing otherwise **declares it in that project's `CLAUDE.md`** (the harness does not pin it).
+> But "place no cache layer" is not an available choice, since it is incompatible with §2.
 
 ---
 
-## 2. `useEffect` の中で fetch して `setState` しない
+## 2. Never fetch and `setState` inside a `useEffect`
 
-これは単なる好みではない。**次の欠陥が同時に、必ず入る。**
+This is not a matter of taste. **The following defects all enter, simultaneously and inevitably.**
 
-- 同じデータを複数箇所が要求したときの**重複リクエスト**
-- 先に投げた古い応答が後から届いて上書きする**競合**（連打・高速な切り替えで再現）
-- 画面を離れたときの**キャンセルが無い**
-- アンマウント後の更新
-- **戻ってきたときに再取得されない**（§4 のとおり RN では画面が生き残るため、より深刻）
+- **Duplicate requests** when several places ask for the same data
+- **A race** where an older response sent first arrives later and overwrites (reproduced by rapid taps and fast switching)
+- **No cancellation** when leaving the screen
+- Updates after unmount
+- **No refetch when you come back** (more serious in RN, where the screen survives — see §4)
 
 ```tsx
 //  NG: 上の全部が入る
@@ -70,16 +72,16 @@ useEffect(() => {
 const { data, isPending, error } = useQuery({ queryKey: ['user', id], queryFn: () => fetchUser(id) });
 ```
 
-`useEffect` を使ってよいのは、**外部システムとの同期**（購読の開始と解除、ネイティブイベントの受信）だけである。
+The only permitted use of `useEffect` is **synchronizing with an external system** (starting and stopping a subscription, receiving a native event).
 
 ---
 
-## 3. サーバの値をローカル state に写さない
+## 3. Never copy a server value into local state
 
-クエリの結果を `useState` に代入した瞬間、**キャッシュの更新から切り離される。**
-再取得しても画面は古い値のままになり、「更新したのに反映されない」という形で壊れる。
+The moment you assign a query's result into `useState`, **it is cut off from cache updates.**
+A refetch leaves the screen on the old value, breaking as "I updated it but it doesn't show".
 
-派生値は**レンダ時に導出する**（素の計算、またはクエリ層の `select`）。
+Derive derived values **at render time** (a plain computation, or the query layer's `select`).
 
 ```tsx
 //  NG: 同期が要るオリジナルの複製を作っている
@@ -90,65 +92,65 @@ useEffect(() => { if (data) setRows(data.items); }, [data]);
 const rows = data?.items ?? [];
 ```
 
-例外は**編集中のフォーム**である。これはサーバ値を初期値として始まる別物（クライアント状態）なので、
-写すこと自体は正しい。ただし**いつ初期値を取り直すかを明示的に決める**（黙って上書きしない）。
+The exception is **a form being edited**. That is a different thing (client state) that starts from the server value as its initial value,
+so copying it is correct. But **decide explicitly when the initial value gets re-taken** (never overwrite silently).
 
 ---
 
-## 4. ネイティブでは画面はアンマウントされない
+## 4. On native, screens are not unmounted
 
-Web のルーティングと決定的に違う点である。**スタックに積まれた前の画面は生き続ける。**
+This is the decisive difference from Web routing. **A previous screen pushed onto the stack stays alive.**
 
-- 「マウント時に取得」は、**戻ってきたときに走らない**。再取得はフォーカス復帰か `AppState` の復帰を契機にする
-- タイマー・購読・位置情報の監視は**張られたまま残る**。必ず解除する（バックグラウンドでも動き続け、電池を食う）
-- 画面外の重い処理は、フォーカスを失ったら止める
+- "Fetch on mount" **does not run when you come back**. Trigger a refetch on focus regain or on `AppState` resuming
+- Timers, subscriptions, and location watchers **stay attached**. Always release them (they keep running in the background and drain the battery)
+- Stop heavy processing on an off-screen view once it loses focus
 
-「開発中は画面を作り直しているので気づかない」タイプの欠陥がここに集まる。
-
----
-
-## 5. `Context` を状態管理として使わない
-
-Context は**依存性の注入**の道具であり、状態管理の道具ではない。
-
-- value をメモ化しないと、**consumer が全部再レンダされる**
-- メモ化しても、頻繁に変わる値を入れれば購読単位を選べないので同じことになる
-
-**変化する共有状態は、購読単位を選べるストアに置く。**
-Context に置いてよいのは、**起動後ほぼ変わらないもの**（テーマ・クライアントインスタンス・認証済みユーザの識別子）だけ。
-
-props のバケツリレーが 3 階層を超えたら、Context を足す前に**分割の仕方を疑う**（[components.md](./components.md)）。
+This is where the "you don't notice it in development because the screen gets rebuilt" class of defects gathers.
 
 ---
 
-## 6. 再レンダとアニメーション
+## 5. Never use `Context` as state management
 
-**アニメーションを JS 側の state で毎フレーム駆動しない。**
-UI スレッドで動く手段（Reanimated、または `useNativeDriver`）を使う。
+Context is a tool for **dependency injection**, not for state management.
 
-毎フレームでレイアウトを再レンダする実装は、**開発機では滑らかに動き、実機の低スペック端末でだけカクつく・落ちる。**
-気づけるのが最も遅い種類の欠陥なので、書く時点で避ける。
+- Without memoizing the value, **every consumer re-renders**
+- Even memoized, putting a frequently changing value in it amounts to the same thing, since the subscription unit cannot be chosen
 
----
+**Changing shared state goes in a store where the subscription unit can be chosen.**
+What may go in Context is only **what barely changes after startup** (the theme, a client instance, the authenticated user's identifier).
 
-## 7. 永続化
-
-- **トークン・認証情報・個人情報を `AsyncStorage` に置かない。** 平文で保存される。`expo-secure-store` を使う
-- **永続化した値も「サーバ状態のキャッシュ」であって、アプリの真実ではない。**
-  起動時に復元してよいが、それを最新として扱わない（サーバとの突き合わせが要る）
-
-> 永続化の規約がここで収まらない規模に育ったら、`persistence.md` として葉を切る。
-> **`db.md` という名前にしないこと**（その名前は DB 設計者だけに配送され、実装体に届かない）。
+When a props bucket brigade exceeds 3 levels, **doubt the way it is split** before adding a Context ([components.md](./components.md)).
 
 ---
 
-## ✅ 返す前チェックリスト
+## 6. Re-renders and animation
 
-- [ ] 扱う値ごとに、サーバ状態かクライアント状態かを決めたか
-- [ ] `useEffect` の中で fetch して `setState` していないか
-- [ ] クエリ結果を `useState` に写していないか（写したなら、それは編集中フォームか）
-- [ ] 画面が生き残る前提で、再取得の契機を決めたか
-- [ ] 張った購読・タイマーを解除したか
-- [ ] 頻繁に変わる値を Context に入れていないか
-- [ ] アニメーションを JS の state で駆動していないか
-- [ ] 機微な値を `AsyncStorage` に置いていないか
+**Never drive an animation frame by frame from JS-side state.**
+Use a means that runs on the UI thread (Reanimated, or `useNativeDriver`).
+
+An implementation that re-renders the layout every frame **runs smoothly on a dev machine and only stutters or dies on a low-spec real device.**
+It is the class of defect you notice latest, so avoid it at the moment you write it.
+
+---
+
+## 7. Persistence
+
+- **Never put tokens, credentials, or personal information in `AsyncStorage`.** It is stored in plaintext. Use `expo-secure-store`
+- **A persisted value is also "a cache of server state", not the app's truth.**
+  Restoring it at startup is fine, but never treat it as the latest (it needs reconciling with the server)
+
+> When the persistence rules grow beyond what fits here, carve a leaf as `persistence.md`.
+> **Never name it `db.md`** (that name is delivered only to the DB designer and never reaches the implementers).
+
+---
+
+## ✅ Checklist before returning
+
+- [ ] For each value handled, did you decide whether it is server state or client state?
+- [ ] Are you fetching and `setState`-ing inside a `useEffect`?
+- [ ] Are you copying a query result into `useState`? (if so, is it an in-progress edit form?)
+- [ ] On the premise that screens survive, did you decide the trigger for refetching?
+- [ ] Did you release the subscriptions and timers you attached?
+- [ ] Are you putting a frequently changing value into Context?
+- [ ] Are you driving an animation from JS state?
+- [ ] Are you putting sensitive values into `AsyncStorage`?

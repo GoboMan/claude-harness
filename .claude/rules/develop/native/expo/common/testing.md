@@ -8,81 +8,83 @@ paths:
   - "**/jest.config.*"
 ---
 
-# 🧪 Expo — テストの共通則（全レイヤ）
+# 🧪 Expo — common testing rules (all layers)
 
-> **適用範囲: Expo (expo-router) の React Native アプリ。** Expo でなければ本書は適用外として読み捨てること。
+> **Scope: React Native apps on Expo (expo-router).** If it is not Expo, treat this document as inapplicable and discard it.
 >
-> **テストの原則（何を・なぜテストするか）は develop の開発プロセスが土台。**
-> 1 テスト = 1 振る舞い／失敗・空・権限・境界を条件に含める／モックは境界だけ／
-> 決定的にする／カバレッジは目標でなく信号——これらは全開発共通なのでここには再掲せず、そこに従う。
+> **The principles of testing (what to test and why) rest on develop's development process.**
+> One test = one behavior; include failure, empty, permission, and boundary in the conditions; mock only at the boundary;
+> make it deterministic; coverage is a signal, not a target — these are common to all development, so they are not restated here; follow them there.
 >
-> 本書は **Expo でその原則を成立させるための配線**だけを持つ。
-> **frontend のテスト書き方葉は当面置かない**（develop は FE テストを起票しない）。記法は [common/coding.md](./coding.md)。
+> This document holds only **the wiring that makes those principles hold in Expo**.
+> **No frontend testing leaf is placed for now** (develop does not file FE tests). Notation is [common/coding.md](./coding.md).
+>
+> **Write test names and comments in Japanese.**
 
 ---
 
-## 1. ランナーと preset
+## 1. The runner and the preset
 
-**Jest を使い、preset は `jest-expo` にする。**
+**Use Jest, with the `jest-expo` preset.**
 
-素の `react-native` preset や自前の ts-jest 構成を組まない。Expo モジュールの解決先と、
-トランスパイル対象の除外設定（`transformIgnorePatterns`）が preset 側で揃っているためで、
-自前構成にすると **「モジュールを import した瞬間に構文エラーで落ちる」**という失敗を再生産する。
-これはテスト対象の欠陥ではなく設定の欠陥なので、そこで時間を溶かさない。
-
----
-
-## 2. 実行はコマンド一発
-
-- **コマンド 1 つで全件実行でき、終了コードで赤緑が判定できる**こと
-- **未導入なら、その導入が着手のゲート**である。ランナーが無いまま実装だけ進めると
-  develop の Phase4（機械オラクルで回す赤緑ループ）が成立しない
-- 選定・設定・実行コマンドは**プロジェクトの `CLAUDE.md` に記録する**（harness 側では固定しない）
-- **スコープ実行（機能ID タグ）**: すべてのテストで最外の `describe` を
-  `describe('F-001 <機能名>', ...)` の形にし、機能ID（`docs/specs/` のディレクトリ名と同じキー）で
-  機械選択できるようにする。指定実行は `jest -t "F-001"`。修正ループ中は該当機能の指定実行で回し、
-  フル実行は境界（返す直前・commit 前・CI）に寄せる
+Never build a bare `react-native` preset or your own ts-jest configuration. The preset already aligns where Expo modules resolve
+and the transpilation exclusions (`transformIgnorePatterns`), and rolling your own reproduces the failure
+**"a syntax error the moment you import the module"**.
+That is a defect in the configuration, not in what you are testing, so do not burn time there.
 
 ---
 
-## 3. React Native で「決定的」とは何か
+## 2. One command to run
 
-非決定性の源は実時刻・乱数・ネットワークだけではない。RN には固有の揺れがある。
+- **A single command must run everything, with the exit code deciding red or green**
+- **If none is installed, installing it is the gate to starting.** Pushing implementation forward with no runner means
+  develop's Phase4 (the red-green loop driven by the machine oracle) does not hold
+- The choice, the configuration, and the run command are **recorded in the project's `CLAUDE.md`** (the harness does not pin them)
+- **Scoped execution (the feature ID tag)**: in every test, make the outermost `describe` read
+  `describe('F-001 <feature name>', ...)`, so it can be selected mechanically by the feature ID
+  (the same key as the directory name under `docs/specs/`). Run the selection with `jest -t "F-001"`. During the fix loop, run the selection for that feature;
+  push full runs to the boundaries (before returning, before commit, in CI)
 
-| 揺れの源 | 扱い |
+---
+
+## 3. What "deterministic" means in React Native
+
+The sources of non-determinism are not only real time, randomness, and the network. RN has its own wobbles.
+
+| Source of wobble | How to handle it |
 | --- | --- |
-| アニメーション・トランジション | 完了を待たない。アニメーションは検証対象にしない |
-| `InteractionManager` の遅延実行 | フェイクタイマーで進める |
-| レイアウト計測（`onLayout`） | テスト環境では 0 が返る。寸法に依存した分岐を検証対象にしない |
-| ネイティブブリッジ越しの非同期応答 | モックして即時解決させる |
+| Animations and transitions | never wait for completion. Never make an animation the thing under verification |
+| `InteractionManager`'s deferred execution | advance it with fake timers |
+| Layout measurement (`onLayout`) | returns 0 in the test environment. Never verify a branch that depends on dimensions |
+| Async responses across the native bridge | mock them and resolve immediately |
 
-**実時間の `sleep` で待たない。** 待ちは非同期クエリとフェイクタイマーで表現する。
-実時間待ちは遅いだけでなく、CI の負荷次第で落ちるフレークを必ず生む。
+**Never wait with a real-time `sleep`.** Express waiting through async queries and fake timers.
+Real-time waiting is not just slow — it always produces a flake that fails depending on CI load.
 
 ---
 
-## 4. スイートは「実行に何を要求するか」で分ける
+## 4. Split suites by what execution requires
 
-テストレベルの呼び名（単体／結合／システム）を先に決めて分類するのではなく、
-**そのテストを走らせるのに何を起動する必要があるか**で分ける。この基準は判断を要さず機械的に決まり、
-かつ「§2 の赤緑ループに混ぜてよいか」と一致する。
+Rather than picking test-level names (unit / integration / system) first and classifying by them,
+split by **what has to be started for that test to run**. This criterion needs no judgment, is decided
+mechanically, and coincides with "may this be mixed into §2's red-green loop?"
 
-| スイート | 判定基準（これだけで決まる） | 住所（既定） | 回す頻度 |
+| Suite | The criterion (this alone decides it) | Location (the default) | How often it runs |
 | --- | --- | --- | --- |
-| **既定**（単体） | 外部環境を一切起動しない（モックは境界だけ） | 現行どおり（対象構成をミラー／`__tests__/`） | 赤緑ループで毎回 |
-| **結合** | **実 API・実サービスに接続する** | `tests/integration/` | 境界（返す直前・commit 前・CI）のみ |
-| **システム** | **シミュレータ・実機・ブラウザを起動する** | `e2e/`（Maestro / Detox の慣習に従ってよい） | 工程外（opt-in） |
+| **Default** (unit) | starts no external environment (mocks only at the boundary) | as-is (mirroring the target structure, `__tests__/`) | every time in the red-green loop |
+| **Integration** | **connects to a real API or a real service** | `tests/integration/` | at a boundary only (before returning, before commit, in CI) |
+| **System** | **starts a simulator, a real device, or a browser** | `e2e/` (following the Maestro / Detox convention is fine) | outside the phases (opt-in) |
 
-- **分離はフォルダで行う。** タグでの分離は、実行コマンド側の設定漏れで既定スイートに混入したとき気づけない
-- **Jest の探索から結合・システムの住所を外す。** `testPathIgnorePatterns` に `tests/integration` と `e2e` を入れる。
-  入れ忘れると、`*.test.ts` / `__tests__` という名前だけで既定スイートに拾われ、シミュレータ起動が赤緑ループに紛れ込む
-- **既定スイートは、シミュレータもサーバも用意されていないマシンで緑になる**こと
-- **システムスイートは develop の工程に無い**（Phase4 の機械オラクルは当面 BE 側。FE テストは起票しない）。
-  必要と判断したプロジェクトが独自に足すもので、本書はその書き方を扱わない。定めるのは**住所と「既定スイートに混ぜない」ことだけ**である
+- **Separate by folder.** Separation by tag cannot be noticed when a gap in the run command's configuration lets something leak into the default suite
+- **Exclude the integration and system locations from Jest's discovery.** Put `tests/integration` and `e2e` in `testPathIgnorePatterns`.
+  Forget it and the mere names `*.test.ts` / `__tests__` get them picked up by the default suite, and a simulator launch slips into the red-green loop
+- **The default suite must go green on a machine with neither a simulator nor a server available**
+- **The system suite is not part of develop's phases** (Phase4's machine oracle is on the BE side for now; FE tests are not filed).
+  A project that judges it necessary adds it itself, and this document does not cover how to write it. All it defines is **the location and "never mix it into the default suite"**
 
-### 契約適合テストは既定スイートに置く
+### Contract-conformance tests belong to the default suite
 
-外部環境を起動しない契約適合テストは**結合スイートではない**（上表の判定基準では既定に落ちる）。
+A contract-conformance test that starts no external environment is **not an integration test** (by the criterion above it falls into the default suite).
 
-**ここを結合スイートへ移してはならない。** develop の Phase4 機械オラクルは当面 **BE テスト**が担う（FE テストは起票しない）。
-赤緑ループから外れた瞬間、結合欠陥を Phase4 で捕まえる手段が無くなる。
+**It must never be moved into the integration suite.** develop's Phase4 machine oracle is carried, for now, by the **BE tests** (FE tests are not filed).
+The moment it leaves the red-green loop, there is no means left of catching an integration defect in Phase4.

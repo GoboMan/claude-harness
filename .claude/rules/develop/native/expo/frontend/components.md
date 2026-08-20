@@ -7,56 +7,58 @@ paths:
   - "**/eas.json"
 ---
 
-# 🧱 Expo / frontend — コンポーネントの粒度と分担
+# 🧱 Expo / frontend — component granularity and the division of work
 
-> **適用範囲: Expo (expo-router) の React Native アプリ。** Expo でなければ本書は適用外として読み捨てること。
+> **Scope: React Native apps on Expo (expo-router).** If it is not Expo, treat this document as inapplicable and discard it.
 >
-> 表面の記法は [coding.md](./coding.md)、状態の持ち方は [dataflow.md](./dataflow.md)、
-> 画面の住所は [routing.md](./routing.md)。
-> 本書は**コンポーネント群をどう分割し、誰がどこを書くか**を定める。
+> Surface notation is [coding.md](./coding.md); how state is held is [dataflow.md](./dataflow.md);
+> where screens live is [routing.md](./routing.md).
+> This document defines **how to split a set of components and who writes which part**.
+>
+> **Write comments and user-facing text in Japanese.**
 
 ---
 
-## 1. 層は責務、住所は共有範囲（この 2 つは別軸）
+## 1. The layer is the responsibility; the location is the scope of sharing (two separate axes)
 
-**層（何を知ってよいか）と住所（どこに置くか）を混同しない。**
-層は責務で決まり、住所は「今いくつの場所から使われているか」で決まる。
+**Never conflate the layer (what it may know) with the location (where it goes).**
+The layer is determined by responsibility; the location by "how many places use it right now".
 
-### 層＝責務
+### Layer = responsibility
 
-| 層 | 責務 | 例 |
+| Layer | Responsibility | Examples |
 | --- | --- | --- |
-| **ui**（原子） | それ以上分解しない見た目の最小単位。業務も通信も知らない | `Button` `TextField` `Avatar` |
-| **parts**（分子） | ui を組み合わせた再利用可能なまとまり。局所状態は持つが業務を知らない | `SearchBar` `Modal` `EmptyState` |
-| **feature**（有機体） | 業務を知るまとまり。契約に沿った通信・クエリに触れてよい | `UserList` `OrderForm` |
-| **screen / route** | 構成と配線のみ。見た目は下位層に委ねる | `app/user/[id].tsx` |
+| **ui** (atoms) | the smallest unit of appearance, decomposed no further. Knows neither business nor communication | `Button` `TextField` `Avatar` |
+| **parts** (molecules) | a reusable grouping of ui. Holds local state but knows no business | `SearchBar` `Modal` `EmptyState` |
+| **feature** (organisms) | a grouping that knows the business. May touch contract-conformant communication and queries | `UserList` `OrderForm` |
+| **screen / route** | composition and wiring only. Appearance is delegated to the lower layers | `app/user/[id].tsx` |
 
-**再利用される部品は業務ドメインを知らない。** `Button` が「注文」を知り始めたら、それは `feature` である。
-props の名前も、その層の語彙で付ける（`ui` の props に業務用語を持ち込まない）。
+**A reusable component knows no business domain.** The moment `Button` starts knowing about "orders", it is a `feature`.
+Name props in that layer's vocabulary too (never bring business terms into a `ui` component's props).
 
-### 住所＝共有範囲
+### Location = the scope of sharing
 
-**実際に使われている範囲の最小の場所に置く。** 1 画面でしか使っていないうちは、共通置き場へ上げない。
-**2 箇所目が現れた時点で切り出し、住所も一緒に上げる。**
+**Put it at the smallest place covering the range actually in use.** While only one screen uses it, do not promote it to a shared location.
+**Carve it out the moment a second site appears, and raise the location along with it.**
 
-**書き始める前に既存を探す。** 同じ見た目を別々に定義した状態を作らない
-（ボタンの角丸を変えるのに 7 ファイル直す、という保守コストを最初から発生させない）。
+**Search for an existing one before you start writing.** Never create a state where the same appearance is defined separately
+(never incur, from the outset, the maintenance cost of fixing 7 files to change a button's corner radius).
 
-> **ディレクトリ名は harness では固定しない。** `components/` / `features/` / `src/ui/` のどれを使うかは
-> プロジェクトで決め、**そのプロジェクトの `CLAUDE.md` に記録する**。**分離そのものは固定する。**
+> **The harness does not pin directory names.** Whether to use `components/` / `features/` / `src/ui/` is
+> decided by the project and **recorded in that project's `CLAUDE.md`**. **The separation itself is pinned.**
 
 ---
 
-## 2. UI 実装体とロジック実装体の分担境界
+## 2. The boundary between the UI implementer and the logic implementer
 
-**この分離は develop の要求であり、任意ではない。** 見た目とロジックは別コンテキストの実装体が担当し、
-オラクル（見た目は人間の一瞥、ロジックは機械テスト）が違うために分けている。
+**This separation is develop's requirement, not optional.** Appearance and logic are handled by implementers in separate contexts,
+split because their oracles differ (the human eyeball for appearance, machine tests for logic).
 
-### 構造として必ず作る分割
+### The split you always create structurally
 
-**ルートファイル＝配線、ビューコンポーネント＝表示。**
-`app/**` のルートファイルはフックの呼び出しと props の受け渡しだけを持ち、
-**JSX の実体は presentational なビューコンポーネント側に置く。**
+**The route file = wiring; the view component = display.**
+A route file under `app/**` holds only hook calls and passing props;
+**the substance of the JSX goes on the presentational view component's side.**
 
 ```tsx
 //  app/user/[id].tsx — 配線だけ
@@ -67,80 +69,80 @@ export default function UserScreen() {
 }
 ```
 
-### その結果として、担当が機械的に分かれる
+### As a result, ownership divides mechanically
 
-| 実装体 | 書くもの | 書かないもの |
+| Implementer | What it writes | What it does not write |
 | --- | --- | --- |
-| **UI 実装体** | presentational コンポーネント（**props だけで表示が決まる**）とスタイル | **クエリフック・API クライアント・ストア・`expo-secure-store` を import しない。`fetch` を書かない。** データは契約どおりの固定モックを props に流す |
-| **ロジック実装体** | フック・API クライアント・クエリ／ストア設定・ルートファイルでの配線 | **JSX の構造とスタイルを作り直さない** |
+| **The UI implementer** | presentational components (**display determined by props alone**) and styling | **Never imports a query hook, an API client, a store, or `expo-secure-store`. Never writes `fetch`.** Data flows in as contract-conformant fixed mocks on the props |
+| **The logic implementer** | hooks, the API client, query / store configuration, the wiring in a route file | **Never rebuilds the JSX structure or the styling** |
 
-### props 型が 2 者の間の契約である
+### The props type is the contract between the two
 
-**UI 実装体が props 型を定義して export し、ロジック実装体はそれに合わせて写像する。**
-ロジック側が props 型を勝手に変えない。
+**The UI implementer defines and exports the props type, and the logic implementer maps onto it.**
+The logic side never changes the props type on its own.
 
-**足りないと分かったら、どちらの側も実装を止めて報告する**（各実装体の出力契約のとおり）。
-自分の都合で片側だけ変えると、もう一方の緑が偽になる。
-
----
-
-## 3. UI 状態は props で表現する
-
-**loading / empty / error / 権限なし / 境界（長文・0 件・巨大な数値）は、すべて props で表現する。**
-UI 側は**その状態がどこから来たかを知らない。**
-
-ロジック側の仕事は「クエリの状態を props へ写像する」ことに閉じる。
-ここが崩れて UI 側が通信を知り始めると、**見た目だけ先に確認する**という分離が成立しなくなる。
+**When either side finds it insufficient, that side stops implementing and reports** (per each implementer's output contract).
+Changing one side for your own convenience makes the other side's green a lie.
 
 ---
 
-## 4. 依存は下向きの一方向
+## 3. UI states are expressed through props
 
-`screen → feature → parts → ui` の向きにだけ依存する。**逆流と横断を作らない。**
+**loading / empty / error / no-permission / boundary (long text, 0 rows, a huge number) are all expressed through props.**
+The UI side **does not know where that state came from.**
 
-- 下位層が上位層を import しない
-- 同じ層どうしで相互に import しない（循環になる）
-- 子から親への通知は、**親が渡したコールバックを呼ぶ**形にする（子が親を知らない）
-
----
-
-## 5. リストは `FlatList` に載せる
-
-**件数が可変・長くなりうるリストを `.map()` で描かない。** 全行が同時にマウントされ、実機で落ちる。
-
-`FlatList`（または `FlashList`）に載せたうえで、次を守る。
-
-- **`keyExtractor` は安定・一意な id を返す。**
-  既定は `key` → `id` → **配列の index** の順にフォールバックする。
-  **index に落ちると、並び替え・削除で行と状態がずれる**（別の行の値が表示される）
-- **行コンポーネントはメモ化し、渡す props を毎レンダ作り直さない。**
-  インラインのスタイル・コールバックはメモ化を無効化する（[coding.md](./coding.md) §2 と同じ理由）
-- **`getItemLayout` は行の高さが固定のときだけ**付ける。付ければ `scrollToIndex` が正しく動く。
-  可変高で付けると位置がずれる
-- **同じ向きの `ScrollView` の中に `FlatList` を入れない。** 仮想化が無効化され、載せた意味が消える。
-  ヘッダを付けたいなら `ListHeaderComponent` を使う
-- 空・読み込み中・末尾は `ListEmptyComponent` / `ListFooterComponent` で表現する
+The logic side's job stays closed on "mapping the query's state into props".
+Once that breaks and the UI side starts knowing about communication, the separation of **confirming the appearance first** stops holding.
 
 ---
 
-## 6. 見た目のトークンを重複させない
+## 4. Dependencies run one way, downward
 
-- 色・余白・角丸・字送りは**トークンに置き、生の値を直書きしない**
-- 同じ見た目のスタイル定義を 2 つのコンポーネントに書かない
-- **再利用される `ui` 層は外側の余白（`margin`）を持たない。**
-  置き場所ごとに上書きが必要になり、再利用できなくなる。外側の間隔は**親が決める**
+Depend only in the direction `screen → feature → parts → ui`. **Never create backflow or cross-links.**
+
+- A lower layer never imports an upper layer
+- Layers at the same level never import each other (that becomes a cycle)
+- Child-to-parent notification takes the form of **calling a callback the parent passed** (the child does not know the parent)
 
 ---
 
-## ✅ 返す前チェックリスト
+## 5. Lists go on a `FlatList`
 
-- [ ] 書き始める前に、同じ見た目の既存コンポーネントを探したか
-- [ ] 再利用する部品が業務ドメインを知っていないか
-- [ ] 1 箇所でしか使っていないものを共通置き場へ上げていないか
-- [ ] ルートファイルに JSX の実体を書いていないか
-- [ ] （UI 実装体）クエリ・API クライアント・ストアを import していないか
-- [ ] （ロジック実装体）JSX の構造とスタイルを作り直していないか
-- [ ] UI 状態（loading / empty / error / 権限 / 境界）をすべて props で受けているか
-- [ ] 依存が下向き一方向になっているか
-- [ ] 可変長リストが `FlatList` に載り、`keyExtractor` が安定 id を返しているか
-- [ ] `ui` 層のコンポーネントが外側の `margin` を持っていないか
+**Never render a list of variable, potentially long length with `.map()`.** Every row mounts at once and it dies on a real device.
+
+Put it on a `FlatList` (or `FlashList`) and observe the following.
+
+- **`keyExtractor` returns a stable, unique id.**
+  The default falls back in the order `key` → `id` → **the array index**.
+  **Falling to the index desynchronizes rows and their state on a reorder or a delete** (another row's value gets displayed)
+- **Memoize the row component and never rebuild the props you pass every render.**
+  Inline styles and callbacks defeat the memoization (the same reason as [coding.md](./coding.md) §2)
+- **Add `getItemLayout` only when the row height is fixed.** With it, `scrollToIndex` works correctly.
+  Adding it with variable heights misplaces the position
+- **Never put a `FlatList` inside a `ScrollView` of the same direction.** Virtualization is defeated and putting it on a list means nothing.
+  To add a header, use `ListHeaderComponent`
+- Express empty, loading, and the tail with `ListEmptyComponent` / `ListFooterComponent`
+
+---
+
+## 6. Never duplicate visual tokens
+
+- Colors, spacing, corner radii, and letter-spacing **live in tokens; never hardcode raw values**
+- Never write the same visual style definition in two components
+- **A reusable `ui` layer component carries no outer margin (`margin`).**
+  Every placement would need an override and it stops being reusable. Outer spacing is **decided by the parent**
+
+---
+
+## ✅ Checklist before returning
+
+- [ ] Did you search for an existing component with the same appearance before starting?
+- [ ] Does a reusable component know the business domain?
+- [ ] Have you promoted something used in one place only to a shared location?
+- [ ] Have you written the substance of the JSX into the route file?
+- [ ] (UI implementer) Are you importing a query, an API client, or a store?
+- [ ] (Logic implementer) Are you rebuilding the JSX structure and the styling?
+- [ ] Are all UI states (loading / empty / error / permission / boundary) received through props?
+- [ ] Do dependencies run one way, downward?
+- [ ] Is a variable-length list on a `FlatList`, with `keyExtractor` returning a stable id?
+- [ ] Does a `ui`-layer component carry an outer `margin`?
