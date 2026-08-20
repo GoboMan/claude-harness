@@ -6,42 +6,44 @@ paths:
   - "**/crow3_*/app/assets/js/**"
 ---
 
-# 🧩 crow / frontend — ビューパーツの書き方
+# 🧩 crow / frontend — how to write a viewpart
 
-> 共通スタイルは [common/coding.md](../common/coding.md)、表面の上乗せは [coding.md](./coding.md)。
-> 本書は **ビューパーツ（`app/viewparts/**/*.php`）を書くときの構造規約**を定める。
-> データの流れ・宣言的な書き方・親子関係は [viewpart-dataflow.md](./viewpart-dataflow.md)、
-> 粒度と再利用は [viewpart-components.md](./viewpart-components.md) が担当する。
+> The common style is [common/coding.md](../common/coding.md); the surface-layer delta is [coding.md](./coding.md).
+> This document defines **the structural rules for writing a viewpart (`app/viewparts/**/*.php`)**.
+> Data flow, the declarative style, and parent/child relationships are covered by [viewpart-dataflow.md](./viewpart-dataflow.md);
+> granularity and reuse by [viewpart-components.md](./viewpart-components.md).
+>
+> **Write comments and user-facing text in Japanese.**
 
 ---
 
-## 1. パーツファイルの骨格
+## 1. The skeleton of a part file
 
-1 パーツ ＝ 1 ファイル。セクションタグで区切られた crow 独自 DSL である。
+One part = one file. It is crow's own DSL, delimited by section tags.
 
-**セクションタグは必ず単独行に書く。** パーサはインデントを除いた行が `<props>` 等と完全一致する行だけを境界とみなすため、
-インラインで書くと**エラーにならず本文として無視される**（サイレント事故）。
+**Always write a section tag on a line of its own.** The parser treats as a boundary only a line that, with indentation stripped, matches `<props>` and the like exactly — so
+written inline, it **is silently ignored as body text rather than raising an error** (a silent accident).
 
-使うセクションは次の 9 種。**これ以外は使わない。**
+There are 9 sections in use. **Never use anything else.**
 
-| セクション | 用途 |
+| Section | Use |
 | --- | --- |
-| `<props>` | プロパティ定義（初期値）。**リアクティブ** |
-| `<template>` | HTML。直下は必ず 1 要素 |
-| `<style>` | ICSS。パーツ名でスコープされる（§7 に制約あり） |
-| `<init>` | マウント時。自パーツの DOM はあるが document には未接続 |
-| `<ready>` | document 接続後。イベント配線と初回描画はここ |
-| `<watch>` | プロパティ変更ハンドラ |
-| `<method>` | パーツのメソッド |
-| `<recv>` | メッセージ受信ハンドラ（横断的通知のみ） |
-| `<depends>` | 明示的な依存パーツ（プリフェッチ対象） |
+| `<props>` | property definitions (initial values). **Reactive** |
+| `<template>` | the HTML. Exactly one element directly beneath it |
+| `<style>` | ICSS, scoped by the part name (with the caveats in §7) |
+| `<init>` | on mount. The part's own DOM exists but is not yet connected to the document |
+| `<ready>` | after connection to the document. Event wiring and the first render go here |
+| `<watch>` | property-change handlers |
+| `<method>` | the part's methods |
+| `<recv>` | message-receipt handlers (cross-cutting notifications only) |
+| `<depends>` | explicitly declared dependent parts (prefetch targets) |
 
-テストは**パーツファイルの中に書かない**。**FE テストは当面 harness が起票しない**（frontend の testing 葉は置かない）。
+**Never write tests inside a part file.** **The harness does not file FE tests for now** (no frontend testing leaf is placed).
 
-### 記述順を固定する
+### Fix the order of the sections
 
-上表の順で書く。既存パーツは全ファイルがこの順・同じ罫線コメント付きで統一されているので、これに倣う。
-**使わないセクションも空のまま残す**（後から書き足す場所が一定になる）。
+Write them in the order of the table above. Existing parts are uniform across every file in this order with the same ruled comments, so imitate that.
+**Leave even the sections you do not use, empty** (so the place to add later is always the same).
 
 ```php
 /*
@@ -66,115 +68,115 @@ paths:
 </template>
 ```
 
-### PHP が使える
+### PHP is available
 
-ファイルは `eval("?>".file_get_contents())` される。サーバ側の値を焼き込みたい時は PHP を使ってよい。
-ただし**焼き込みはビルド時に確定する**（パーツは role/module/action/lang 単位でキャッシュされる）。
-リクエストごとに変わる値を焼き込まないこと。
+The file is run through `eval("?>".file_get_contents())`. When you want to bake in a server-side value, PHP is fine.
+But **what is baked in is settled at build time** (parts are cached per role/module/action/lang).
+Never bake in a value that changes per request.
 
 ---
 
-## 2. 配置と命名
+## 2. Placement and naming
 
-パーツは次の 4 階層を**この順に**走査して集められ、**同名は後勝ちで上書き**される。
+Parts are collected by scanning the following 4 levels **in this order**, and **a same-named part later in the order overwrites the earlier**.
 
 1. `app/viewparts/_common_`
 2. `app/viewparts/[role]/_common_`
 3. `app/viewparts/[role]/[module]/_common_`
 4. `app/viewparts/[role]/[module]/[action]`
 
-**置き場は共有範囲で決める。** 住所の正本は [viewpart-components.md](./viewpart-components.md) **§1**、
-共通化の切り出し判断は同 **§6** に従う。
+**Placement is decided by the scope of sharing.** Locations are authoritative in [viewpart-components.md](./viewpart-components.md) **§1**,
+and the decision to carve something out as shared follows **§6** of that same document.
 
-### パーツ名はフォルダ構成から機械的に決まる
+### A part's name is determined mechanically from the folder structure
 
-サブフォルダはモジュールになり、パーツ名はアンダーバー連結で決まる。
+A subfolder becomes a module, and the part name is determined by underscore concatenation.
 
-| ファイル | モジュール名 | パーツ名 |
+| File | Module name | Part name |
 | --- | --- | --- |
-| `_common_/footer.php` | なし | `footer` |
-| `_common_/scene/top/_.php` | `scene_top` | `scene_top`（`_.php` はフォルダ名そのもの） |
+| `_common_/footer.php` | none | `footer` |
+| `_common_/scene/top/_.php` | `scene_top` | `scene_top` (`_.php` is the folder name itself) |
 | `_common_/scene/top/child.php` | `scene_top` | `scene_top_child` |
 
-**ファイル名がモジュール名の先頭一致だとパーツ名がモジュール名に縮む**という分岐がある。
-意図せず名前が衝突するので、**モジュール名の一部と同じファイル名を付けない**。
+There is a branch where **a file name that prefix-matches the module name shrinks the part name down to the module name**.
+That collides unintentionally, so **never give a file the same name as a part of the module name**.
 
-> **パーツ名の前方一致にも注意する。** `<style>` のスコープは部分一致なので（§7）、
-> `ui_button` と `ui_button_group` のように**一方が他方の先頭に含まれる名前**を作ると CSS が混ざる。
+> **Watch prefix matching in part names too.** `<style>` scoping is a partial match (§7), so
+> creating names where **one is contained at the head of the other**, like `ui_button` and `ui_button_group`, mixes the CSS together.
 
-同一モジュール内の埋め込みはモジュール名を省略できる（`[[child]]` ＝ `[[scene_top_child]]`）。
-一方 `viewpart_create()` に渡す名前は省略できないので、**子の生成は `create_child*` 系を使う**（省略可）。
+Embedding within the same module may omit the module name (`[[child]]` = `[[scene_top_child]]`).
+The name passed to `viewpart_create()`, on the other hand, cannot be omitted, so **create children with the `create_child*` family** (where it can).
 
-### pref（子ハンドル）の付け方
+### How to assign a pref (the child handle)
 
-`pref` を省略すると「パーツ名からモジュール名部分を除いた名前」が自動で割り当たる。
+Omitting `pref` auto-assigns "the part name with the module-name portion removed".
 
-| 場面 | pref の付け方 |
+| Situation | How to assign pref |
 | --- | --- |
-| 同じパーツを**個別に掴みたい** | `[[child pref="left"]]` のように**1 つずつ別名**を付ける。同名だと `pref()` は最初の 1 つしか返さない |
-| **リストとして一括で扱いたい** | **全行に同じ pref** を付ける。`prefs()` で全件、`remove_pref()` で全消しできる |
+| You want to **grab the same part individually** | give **a distinct name to each one**, as in `[[child pref="left"]]`. With the same name, `pref()` returns only the first |
+| You want to **handle them together as a list** | give **every row the same pref**. `prefs()` gets them all; `remove_pref()` removes them all |
 
-リスト描画は後者が正しい用法である（[viewpart-dataflow.md](./viewpart-dataflow.md) §4）。
-
----
-
-## 3. ライフサイクル
-
-```
-コンストラクタ   props 確定（<props> の既定値 ← args_ で上書き）
-                 <method> をインスタンスへ直付け
-                 <template> を複製して自パーツの DOM サブツリーを構築
-                 ref に uid を付与、":" 属性をバインド
-       ↓
-埋め込み子の解決  [[…]] の子パーツを生成してマウント（＝子の <init> はここで走る）
-       ↓
-マウント          watch 開始 → <init> 本文
-       ↓
-document へ接続   <ready>
-```
-
-**押さえるべき順序は 2 つ。**
-
-- **`<init>` はマウント時に走る。** 生成直後ではない。そして**テンプレートに埋め込んだ子は、親の `<init>` より先に**生成・初期化される
-- **watch は `<init>` 本文より前に開始される。** 「init が終わってから watch が動き出す」のではない
-
-### `<init>` の時点で DOM は「ある」が「繋がっていない」
-
-コンストラクタで `<template>` は複製済みなので、**`<init>` から `self.ref()` / `self.jq()` は使える**。
-無いのは document への接続だけである。したがって `<init>` で効かないのは次のような**接続を前提とする操作**に限られる。
-
-- 要素のサイズ・位置の取得（`offsetWidth` / `getBoundingClientRect()` など）
-- `focus()` / スクロール操作
-- `window` 基準の計算
-
-これらは `<ready>` で行う。
-
-### 各セクションの責務
-
-| セクション | 書いてよいもの | 書いてはいけないもの |
-| --- | --- | --- |
-| `<init>` | 内部状態（`self.v`）の初期化、クロージャ props の代入、グローバルイベント登録 | サイズ取得・`focus()` など document 接続を前提とする操作 |
-| `<ready>` | イベント配線、**初回描画の起動**、接続後にしかできない操作 | 長い処理ロジック（`<method>` に切り出す） |
-| `<watch>` | 状態変化に対する再描画の呼び出し | DOM の直接組み立て |
-| `<method>` | パーツの振る舞い | — |
-| `<recv>` | 横断的な受信メッセージの処理 | — |
-
-### `watch_stop()` は原則使わない
-
-`watch_stop()` は `<watch>` だけを止めるのではない。**`{{ }}` のテキスト更新と、親→子の `:` バインド伝播も同時に止まる**。
-しかも `watch_start()` で再開しても**停止中に起きた変更は追い付き再送されない**。
-
-`<init>` の時点で自パーツの DOM は既に存在するので、「DOM 未構築だから止める」という理由は成立しない。
-どうしても必要な場合だけ使い、**必ず `<ready>` で戻し、停止中に落ちた更新を `update_all()` で拾い直す**こと。
+Rendering a list is the correct use of the latter ([viewpart-dataflow.md](./viewpart-dataflow.md) §4).
 
 ---
 
-## 4. 状態は props と `self.v` で使い分ける
+## 3. The lifecycle
 
-| 置き場 | 性質 | 使うもの |
+```
+constructor        props settled (the <props> defaults ← overridden by args_)
+                   <method> attached directly onto the instance
+                   <template> cloned to build the part's own DOM subtree
+                   uids assigned to refs, ":" attributes bound
+       ↓
+embedded children  the [[…]] child parts are created and mounted (= a child's <init> runs here)
+       ↓
+mount              watch starts → the <init> body
+       ↓
+connected to doc   <ready>
+```
+
+**Two orderings must be held in mind.**
+
+- **`<init>` runs on mount**, not right after construction. And **children embedded in the template are created and initialized before the parent's `<init>`**
+- **watch starts before the `<init>` body.** It is not that "watch begins running once init finishes"
+
+### At `<init>`, the DOM "exists" but is "not connected"
+
+Because the constructor has already cloned `<template>`, **`self.ref()` / `self.jq()` are usable from `<init>`**.
+All that is missing is the connection to the document. So what does not work in `<init>` is limited to **operations that presuppose that connection**:
+
+- Getting an element's size or position (`offsetWidth`, `getBoundingClientRect()`, and so on)
+- `focus()` and scroll operations
+- Calculations relative to `window`
+
+Do those in `<ready>`.
+
+### Each section's responsibility
+
+| Section | May be written | Must not be written |
 | --- | --- | --- |
-| `<props>` のプロパティ | **リアクティブ**。変更で bind と watch が発火 | 画面に出る値、親から受け取る値、クロージャ props |
-| `self.v`（`<init>` で初期化） | **非リアクティブ**な内部制御用 | スタック・フラグ・ハンドラ参照など、画面に出ない制御データ |
+| `<init>` | initializing internal state (`self.v`), assigning closure props, registering global events | operations presupposing document connection, such as getting sizes or `focus()` |
+| `<ready>` | event wiring, **kicking off the first render**, operations only possible after connection | long processing logic (carve it into `<method>`) |
+| `<watch>` | invoking a re-render in response to a state change | assembling DOM directly |
+| `<method>` | the part's behavior | — |
+| `<recv>` | handling cross-cutting received messages | — |
+
+### As a rule, do not use `watch_stop()`
+
+`watch_stop()` does not stop `<watch>` alone. **It simultaneously stops `{{ }}` text updates and the parent→child `:` binding propagation.**
+Worse, resuming with `watch_start()` **does not replay the changes that happened while it was stopped**.
+
+Since the part's own DOM already exists at `<init>`, the reason "the DOM isn't built yet, so stop it" does not hold.
+Use it only when truly necessary, and **always restore it in `<ready>` and pick the dropped updates back up with `update_all()`**.
+
+---
+
+## 4. Split state between props and `self.v`
+
+| Where it goes | Nature | What goes there |
+| --- | --- | --- |
+| A property in `<props>` | **Reactive**. A change fires the binds and the watches | values that appear on screen, values received from the parent, closure props |
+| `self.v` (initialized in `<init>`) | **Non-reactive**, for internal control | control data that never appears on screen: stacks, flags, handler references |
 
 ```php
 <init>
@@ -189,33 +191,33 @@ document へ接続   <ready>
 </init>
 ```
 
-### 使う prop はすべて `<props>` に宣言する
+### Declare in `<props>` every prop you use
 
-**`prop()` は `<props>` に無い名前を黙って無視する。** 例外も警告も出ない。
+**`prop()` silently ignores a name that is not in `<props>`.** No exception, no warning.
 
 ```php
 //	<props> に "conut" は無い（typo）→ 代入は何も起きず、読むと null が返る
 self.prop('conut', 3);
 ```
 
-後から prop を増やすことはできないので、**親から受け取る値・クロージャ props も含め、使うものは全部 `<props>` に書く**。
+Props cannot be added later, so **write everything you use in `<props>`, including values received from the parent and closure props**.
 
-### `<props>` の中に `self` は無い
+### There is no `self` inside `<props>`
 
-生成される JS は `props: function(){ return {...}; }` で、**props だけ `let self = this;` が差し込まれない**
-（init / ready / watch / method / recv には差し込まれる）。
+The generated JS is `props: function(){ return {...}; }`, and **`let self = this;` is not injected into props alone**
+(it is injected into init / ready / watch / method / recv).
 
-ブラウザでは `self` はグローバルオブジェクトを指すため、**エラーにならずに壊れる**。
-`self.prop(...)` の呼び出しは例外になるが、`self.v = {...}` のような代入は**無警告でグローバルを汚染して通る**。
-`<props>` には静的な値だけを書き、動的なものは `<init>` 以降で入れる。
+In a browser, `self` refers to the global object, so **it breaks without raising an error**.
+A call to `self.prop(...)` throws, but an assignment such as `self.v = {...}` **passes silently while polluting the global**.
+Write only static values in `<props>`; put dynamic ones in from `<init>` onward.
 
 ---
 
-## 5. DOM の生成と操作
+## 5. Creating and manipulating DOM
 
-### DOM を生成してよいのは `<template>` だけ
+### Only `<template>` may create DOM
 
-**JS から DOM を組み立てない。** 新しい要素が必要になったら、それは「1 つのビューパーツ」である。
+**Never assemble DOM from JS.** When you need a new element, that is "one viewpart".
 
 ```php
 //	NG: jQuery で組み立てる
@@ -233,49 +235,49 @@ self.jq('list').html(rows_html);
 self.create_children_and_append("row", rows, "list");
 ```
 
-禁止するのは次の書き方。**例外は設けない。**
+The following are forbidden. **There are no exceptions.**
 
-- `$('<tag>…</tag>')` / `document.createElement()` / `cloneNode()` による要素生成
-- `.html()` / `.innerHTML` / `.append("<div>…")` など**文字列から DOM を作る**すべての経路
-- `.text()` / `.attr()` / `.addClass()` / `.css()` による表示内容の書き換え
-  → 表示は props バインドで変える（[viewpart-dataflow.md](./viewpart-dataflow.md)）
+- Creating elements via `$('<tag>…</tag>')` / `document.createElement()` / `cloneNode()`
+- Every route that **builds DOM from a string**: `.html()` / `.innerHTML` / `.append("<div>…")`, and so on
+- Rewriting displayed content via `.text()` / `.attr()` / `.addClass()` / `.css()`
+  → change the display through props binding ([viewpart-dataflow.md](./viewpart-dataflow.md))
 
-理由は 3 つ。**①** 見た目が `<template>` と JS に二分され、どこを直せば画面が変わるのか読めなくなる。
-**②** JS で作った要素は `<style>` のスコープ属性を持たないため、CSS の置き場が割れる。
-**③** 文字列連結による生成は XSS の温床になる。
+There are 3 reasons. **①** The appearance splits between `<template>` and JS, and it becomes unreadable where to fix something to change the screen.
+**②** Elements created in JS carry no `<style>` scope attribute, so where the CSS belongs splits.
+**③** Building from string concatenation is a breeding ground for XSS.
 
-### jQuery に許すのは「既にある要素への操作」だけ
+### jQuery is allowed only for "operating on elements that already exist"
 
-| 用途 | 可否 | 代わりに使うもの |
+| Use | Allowed? | What to use instead |
 | --- | --- | --- |
-| イベント配線（`.on()`） | ✅ | — |
-| `focus()` / スクロールなど命令的な操作 | ✅ | — |
-| 要素の生成・追加・置換 | ❌ | ビューパーツとして切り出す |
-| テキスト・属性・class・style の変更 | ❌ | props バインド（`{{ }}` / `attr=":prop"`） |
+| Event wiring (`.on()`) | ✅ | — |
+| Imperative operations such as `focus()` and scrolling | ✅ | — |
+| Creating, appending, or replacing elements | ❌ | carve it out as a viewpart |
+| Changing text, attributes, class, or style | ❌ | props binding (`{{ }}` / `attr=":prop"`) |
 
-### 要素は必ず `self` 経由で取る
+### Always obtain elements through `self`
 
-`ref="btn"` はインスタンス生成時に `ref="btn<uid>"` へ書き換えられる（同じパーツを複数置いても衝突しないため）。
-したがって **`document.querySelector('[ref=btn]')` やグローバルな `$('[ref=btn]')` は動かない。**
+`ref="btn"` is rewritten to `ref="btn<uid>"` at instance construction (so several instances of the same part do not collide).
+Therefore **`document.querySelector('[ref=btn]')` and a global `$('[ref=btn]')` do not work.**
 
-- 取得は **`self.ref()` / `self.refs()` / `self.jq()` だけ**を使う
-- パーツの外の DOM を直接触らない。他パーツの中身を書き換えない（そのパーツの責務）
+- Use **only `self.ref()` / `self.refs()` / `self.jq()`** to obtain elements
+- Never touch DOM outside the part directly. Never rewrite the inside of another part (that is that part's responsibility)
 
-### `<template>` 直下は 1 要素だけ
+### Exactly one element directly beneath `<template>`
 
-複数書くと警告が出てコンストラクタが中断し、**初期化が途中で止まったインスタンスがそのまま画面に出る**
-（何も表示されないとは限らず、壊れた部分表示になる）。複数並べたい時はラッパ要素で包む。
+Writing several raises a warning and aborts the constructor, and **an instance whose initialization stopped halfway goes onto the screen as-is**
+(it does not necessarily show nothing; it shows a broken partial render). When you want several side by side, wrap them in a wrapper element.
 
 ---
 
-## 6. 生成と破棄
+## 6. Creation and disposal
 
-### 生成：遅延ロードの非同期性
+### Creation: the asynchrony of lazy loading
 
-パーツは既定で遅延ロードされる。**`create_child*` / `create_children*` は未ロード時に `null` を返し、
-実体は `on_load_` コールバックで後から渡る。**
+Parts are lazy-loaded by default. **`create_child*` / `create_children*` return `null` when not yet loaded,
+and the real instance arrives later via the `on_load_` callback.**
 
-戻り値に頼るコードは「たまたまロード済みの時だけ動く」時限爆弾になる。
+Code that relies on the return value is a time bomb that "works only when it happens to be already loaded".
 
 ```php
 //	NG: 戻り値を使う（未ロードなら null）
@@ -290,12 +292,12 @@ self.create_child_and_append("row", {id : 1}, null, null, function(child_)
 });
 ```
 
-生成直後に何かしたい場合は、**生成時に `args_` で渡しきるのが最も安全**。
-それが無理な時だけコールバック、または `on_preready()` / `on_ready()` を使う。
+When you want to do something right after creation, **passing everything through `args_` at creation time is the safest**.
+Use the callback, or `on_preready()` / `on_ready()`, only when that is impossible.
 
-### 破棄：後始末は `on_remove()` に登録する
+### Disposal: register cleanup on `on_remove()`
 
-破棄用のセクションは無い。パーツが画面から消えるときの処理は、**`<init>` または `<ready>` で `on_remove()` に登録する**。
+There is no section for disposal. Processing for when a part leaves the screen is **registered on `on_remove()` in `<init>` or `<ready>`**.
 
 ```php
 <init>
@@ -312,30 +314,30 @@ self.create_child_and_append("row", {id : 1}, null, null, function(child_)
 </init>
 ```
 
-**自分の外側に登録したものだけが後始末の対象**である。具体的には次の 2 つ。
+**Only what you registered outside yourself** needs cleanup. Specifically, these two:
 
-- `window` / `document` へのイベントリスナ
-- `setInterval` / `setTimeout` のタイマー
+- Event listeners on `window` / `document`
+- `setInterval` / `setTimeout` timers
 
-自パーツの要素に `self.jq(...).on()` で付けたハンドラは、要素ごと消えるので外す必要はない。
-`dbc.bind()` も `on_remove` で自動解除されるので、明示的な `unbind` は原則不要
-（消える前に早めに外したい場合だけ書く）。
+A handler attached to your own part's element with `self.jq(...).on()` disappears with the element and needs no removal.
+`dbc.bind()` is also released automatically on `on_remove`, so an explicit `unbind` is generally unnecessary
+(write one only when you want to detach early, before it disappears).
 
 ---
 
-## 7. スタイル
+## 7. Styles
 
-`<style>` は `[viewpart*=":パーツ名"] { … }` で包まれてから配信される。
+`<style>` is wrapped as `[viewpart*=":part name"] { … }` before being served.
 
-### スコープは「部分一致」であって完全な隔離ではない
+### The scope is a "partial match", not full isolation
 
-セレクタが `*=`（部分一致）である以上、**自分のパーツ名を先頭に含む別パーツにも当たる**。
-さらに、**子パーツをマウントした先の親側の要素にも子のパーツ名が付与される**ため、
-子の `<style>` のトップレベル宣言は**親のコンテナ要素そのもの**に効きうる。
+Because the selector is `*=` (a partial match), **it also hits another part whose name contains yours as a prefix**.
+Furthermore, **the parent-side element a child was mounted into also receives the child's part name**, so
+a top-level declaration in a child's `<style>` can hit **the parent's container element itself**.
 
-したがって「スコープされているから何を書いてもよい」とは考えない。次を守る。
+So never think "it's scoped, so anything goes". Observe the following.
 
-- **`<style>` の宣言は、必ず自分のルート要素の class 配下に書く。** トップレベルに素の宣言を置かない
+- **Always write `<style>` declarations beneath your own root element's class.** Never put a bare declaration at the top level
 
 ```css
 /*  NG: トップレベルに素の宣言（親のコンテナにも当たる）  */
@@ -350,28 +352,28 @@ padding : 10px;
 }
 ```
 
-- **前方一致するパーツ名を作らない**（§2）。`ui_button` があるなら `ui_button_group` ではなく `ui_buttons` にする
-- **セレクタをパーツ外へ広げない。** `body` や他パーツのクラスを `<style>` から狙わない
-- 共有したい変数・ミックスインは `app/assets/css/` 側に置く
-  （`[role]/` → `[role]/_common_/` → `_common_/` → `engine/assets/css/` の順で解決される）
+- **Never create prefix-matching part names** (§2). If `ui_button` exists, name it `ui_buttons`, not `ui_button_group`
+- **Never widen a selector outside the part.** Never aim at `body` or another part's classes from `<style>`
+- Variables and mixins you want to share go on the `app/assets/css/` side
+  (resolved in the order `[role]/` → `[role]/_common_/` → `_common_/` → `engine/assets/css/`)
 
 ---
 
-## ✅ パーツを書き終えたらの確認
+## ✅ After you finish writing a part
 
-- [ ] セクションタグがすべて単独行になっているか
-- [ ] `<template>` 直下が 1 要素か
-- [ ] 使う prop がすべて `<props>` に宣言されているか（`prop()` の typo は黙って消える）
-- [ ] `<props>` に `self` を書いていないか
-- [ ] `<init>` で サイズ取得・`focus()` など document 接続前提の操作をしていないか
-- [ ] `<ready>` に初回描画の起動があるか
-- [ ] `watch_stop()` を安易に使っていないか（使うなら `<ready>` で戻し、落ちた更新を拾い直したか）
-- [ ] DOM 取得が `self.ref()` / `refs()` / `jq()` だけになっているか
-- [ ] JS から DOM を生成していないか（`$('<tag>')` / `createElement` / `.html()` / 文字列連結）
-- [ ] jQuery の用途がイベント配線と命令的操作だけに収まっているか
-- [ ] `create_child*` の戻り値をそのまま使っていないか
-- [ ] pref の付け方が用途（個別に掴む／一括で扱う）と合っているか
-- [ ] `window` / `document` のリスナやタイマーを `on_remove()` で外しているか
-- [ ] 画面に出ない制御データを props に入れていないか
-- [ ] `<style>` の宣言が自分のルート class の配下に閉じているか
-- [ ] 前方一致するパーツ名を作っていないか
+- [ ] Is every section tag on a line of its own?
+- [ ] Is there exactly one element directly beneath `<template>`?
+- [ ] Is every prop you use declared in `<props>`? (a typo in `prop()` vanishes silently)
+- [ ] Have you written `self` inside `<props>`?
+- [ ] Are you doing anything in `<init>` that presupposes document connection, such as getting sizes or `focus()`?
+- [ ] Is the first render kicked off in `<ready>`?
+- [ ] Are you using `watch_stop()` casually? (if you use it, did you restore it in `<ready>` and pick the dropped updates back up?)
+- [ ] Is DOM access limited to `self.ref()` / `refs()` / `jq()`?
+- [ ] Are you creating DOM from JS? (`$('<tag>')` / `createElement` / `.html()` / string concatenation)
+- [ ] Is jQuery's use confined to event wiring and imperative operations?
+- [ ] Are you using the return value of `create_child*` directly?
+- [ ] Does the way you assigned prefs match the use (grabbing individually / handling together)?
+- [ ] Are `window` / `document` listeners and timers removed in `on_remove()`?
+- [ ] Have you put control data that never appears on screen into props?
+- [ ] Are `<style>` declarations closed beneath your own root class?
+- [ ] Have you created prefix-matching part names?

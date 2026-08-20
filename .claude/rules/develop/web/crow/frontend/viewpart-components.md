@@ -6,89 +6,91 @@ paths:
   - "**/crow3_*/app/assets/js/**"
 ---
 
-# 🧱 crow / frontend — コンポーネントの粒度と再利用
+# 🧱 crow / frontend — component granularity and reuse
 
-> 1 パーツの書き方は [viewpart.md](./viewpart.md)、状態と親子の流れは [viewpart-dataflow.md](./viewpart-dataflow.md)。
-> 本書は**パーツ群をどう分割し、どう使い回すか**を定める。
+> How to write one part is [viewpart.md](./viewpart.md); state and the parent/child flow is [viewpart-dataflow.md](./viewpart-dataflow.md).
+> This document defines **how to split a set of parts and how to reuse them**.
 >
-> 狙いは「同じ見た目が複数箇所で別々に定義される」状態を作らないこと。
-> ボタンの角丸を変えるのに 7 ファイル直す、という保守コストを最初から発生させない。
+> The aim is to never create a state where "the same appearance is defined separately in several places" —
+> never to incur, from the outset, the maintenance cost of fixing 7 files to change a button's corner radius.
+>
+> **Write comments and user-facing text in Japanese.**
 
 ---
 
-## 1. 層は責務、住所は共有範囲（この 2 つは別軸）
+## 1. The layer is the responsibility; the location is the scope of sharing (two separate axes)
 
-**層（何を知ってよいか）と住所（どこまで共有するか）を混同しない。**
-層は責務で決まり、住所は「今いくつの場所から使われているか」で決まる。
-同じ `ui` 層でも、1 画面でしか使っていないうちは action 配下に置いてよい。
+**Never conflate the layer (what it may know) with the location (how widely it is shared).**
+The layer is determined by responsibility; the location by "how many places use it right now".
+Even a part in the `ui` layer may sit under an action while only one screen uses it.
 
-### 層＝責務
+### Layer = responsibility
 
-| 層 | 責務 | 例（パーツ名） |
+| Layer | Responsibility | Examples (part names) |
 | --- | --- | --- |
-| **ui**（原子） | それ以上分解しない見た目の最小単位。業務も通信も知らない | `ui_button` `ui_input` `ui_label` `ui_icon` |
-| **parts**（分子） | ui を組み合わせた再利用可能なまとまり。局所状態は持つが業務を知らない | `search_box` `pager` `modal` |
-| **feature**（有機体） | 業務を知るまとまり。契約に沿った通信・`dbc` に触れてよい | `user_list` `order_form` |
-| **scene / root**（画面） | ルーティングと構成のみ。見た目は下位層に委ねる | `root` `scene_top` |
+| **ui** (atoms) | the smallest unit of appearance, decomposed no further. Knows neither business nor communication | `ui_button` `ui_input` `ui_label` `ui_icon` |
+| **parts** (molecules) | a reusable grouping of ui parts. Holds local state but knows no business | `search_box` `pager` `modal` |
+| **feature** (organisms) | a grouping that knows the business. May do contract-conformant communication and touch `dbc` | `user_list` `order_form` |
+| **scene / root** (screens) | routing and composition only. Appearance is delegated to the lower layers | `root` `scene_top` |
 
-### 住所＝共有範囲
+### Location = the scope of sharing
 
-crow は 4 階層を順に走査してパーツを集めるので、**置き場の深さがそのまま共有範囲になる**。
-層に関係なく、**実際に使われている範囲の最小の階層**に置く。
+crow collects parts by scanning 4 levels in order, so **the depth of the placement is exactly the scope of sharing**.
+Regardless of layer, put it at **the shallowest level that covers the range actually in use**.
 
-| 使われている範囲 | 置き場 |
+| Range in use | Where it goes |
 | --- | --- |
-| 1 つの action だけ | `[role]/[module]/[action]/` |
-| 同じ module の複数 action | `[role]/[module]/_common_/` |
-| 同じ role の複数 module | `[role]/_common_/` |
-| 複数 role | `_common_/` |
+| One action only | `[role]/[module]/[action]/` |
+| Several actions in the same module | `[role]/[module]/_common_/` |
+| Several modules in the same role | `[role]/_common_/` |
+| Several roles | `_common_/` |
 
-`ui` を `_common_/ui/` に、`feature` を `[role]/[module]/_common_/` に置くことが多いのは
-**結果**であって、規則ではない。role 全域で使う `feature` は `[role]/_common_/` に置いてよい。
+That `ui` often ends up in `_common_/ui/` and `feature` in `[role]/[module]/_common_/` is
+**an outcome**, not a rule. A `feature` used across a whole role may sit in `[role]/_common_/`.
 
-### 層は名前で示す
+### The layer is shown by the name
 
-フォルダ名はモジュール名になり、パーツ名に前置される
-（`_common_/ui/button.php` → パーツ名 `ui_button`）。
-これで、名前を見れば層が読めて、置き場を見れば共有範囲が読める。
+A folder name becomes a module name and is prefixed onto the part name
+(`_common_/ui/button.php` → part name `ui_button`).
+With that, the layer is readable from the name and the scope of sharing from the placement.
 
-| 層 | フォルダ／命名（推奨。ui のみ必須） |
+| Layer | Folder / naming (recommended; mandatory for ui only) |
 | --- | --- |
-| **ui** | **必須:** `ui/` 配下＋パーツ名 `ui_` 前置（住所がどこでも） |
-| **parts** | 推奨: `parts/` 配下。業務語を名前に入れない（`search_box` `pager`） |
-| **feature** | 推奨: 機能が分かる名前（`user_list` `order_form`）。`ui_` / 見た目だけの名は付けない |
-| **scene / root** | 推奨: `scene/` 配下または `root`。構成役であることが名前から分かること |
+| **ui** | **Mandatory:** under `ui/`, with the part name prefixed `ui_` (wherever it is located) |
+| **parts** | Recommended: under `parts/`. Never put business vocabulary in the name (`search_box`, `pager`) |
+| **feature** | Recommended: a name that conveys the feature (`user_list`, `order_form`). Never `ui_` or a purely visual name |
+| **scene / root** | Recommended: under `scene/`, or `root`. The name must make its compositional role clear |
 
-> **前方一致するパーツ名を作らない。** `<style>` のスコープは部分一致なので
-> （[viewpart.md](./viewpart.md) §7）、`ui_button` と `ui_button_group` を並べると CSS が混ざる。
-> 後者は `ui_buttons` のように**互いに先頭を含まない名前**にする。
+> **Never create prefix-matching part names.** `<style>` scoping is a partial match
+> ([viewpart.md](./viewpart.md) §7), so putting `ui_button` and `ui_button_group` side by side mixes the CSS.
+> Name the latter something like `ui_buttons` — **names that do not contain each other at the head**.
 
 ---
 
-## 2. 依存は下向きの一方向
+## 2. Dependencies run one way, downward
 
 ```
 scene / root  ──▶  feature  ──▶  parts  ──▶  ui
 ```
 
-- **上位層は下位層を使ってよい。下位層は上位層を知らない。**
-  `ui` パーツが `[[user_list]]` を埋め込む、`parts` が feature のパーツ名を参照する——これらは禁止
-- **同じ層どうしの相互参照も避ける。** `ui_a` が `ui_b` を埋め込むのは、`ui_b` が明確に部品として下位である時だけ
-- 下位層に「上から渡された値と、上から渡されたクロージャ」以外の外部依存を持たせない
+- **An upper layer may use a lower layer. A lower layer does not know the upper.**
+  A `ui` part embedding `[[user_list]]`, or a `parts` referencing a feature's part name — both are forbidden
+- **Avoid mutual references within the same layer too.** `ui_a` embedding `ui_b` is fine only when `ui_b` is clearly a lower-level component
+- Give a lower layer no external dependency beyond "the values passed down and the closures passed down"
 
-この向きが守られていれば、**ui と parts はどの画面にも貼り付けられる**。守られていない瞬間に再利用性は失われる。
+While this direction holds, **ui and parts can be pasted onto any screen**. The moment it breaks, reusability is gone.
 
 ---
 
-## 3. 再利用できるかの判定基準は「業務を知らないこと」
+## 3. The test for reusability is "it knows no business"
 
-`ui` と `parts` は、次をすべて満たすこと。**これが再利用可否の実質的なテストになる。**
+`ui` and `parts` must satisfy all of the following. **This is the practical test of whether something is reusable.**
 
-- `dbc` を読み書きしない
-- グローバル `g` を参照しない
-- 通信（ajax）を行わない
-- `postup` を使わない（[viewpart-dataflow.md](./viewpart-dataflow.md) のとおり、通知はクロージャ props で受ける）
-- props とクロージャ props だけで振る舞いが決まる
+- It neither reads nor writes `dbc`
+- It never references the global `g`
+- It performs no communication (ajax)
+- It never uses `postup` (per [viewpart-dataflow.md](./viewpart-dataflow.md), notifications are received via closure props)
+- Its behavior is determined by props and closure props alone
 
 ```php
 //	ui_button — 何のボタンかを知らない。押されたことを親へ渡すだけ
@@ -131,18 +133,18 @@ scene / root  ──▶  feature  ──▶  parts  ──▶  ui
 </ready>
 ```
 
-> `class=":button_class"` のバインド先は**必ず `<props>` に宣言する**。
-> 宣言の無い prop 名を書いてもバインドは成立せず、`class` 属性に文字列がそのまま残る
-> （エラーも警告も出ない）。`disabled` は挙動を持つ真偽属性なので直接バインドしてよい
-> （[viewpart-dataflow.md](./viewpart-dataflow.md) §3）。
+> The bind target of `class=":button_class"` **must be declared in `<props>`**.
+> Writing an undeclared prop name does not establish a binding, and the string stays in the `class` attribute as-is
+> (no error, no warning). `disabled` is a boolean attribute with behavior, so it may be bound directly
+> ([viewpart-dataflow.md](./viewpart-dataflow.md) §3).
 
-通信・`dbc`・業務判断が要るなら、それは `feature` 層である。**ui に業務を持ち込まず、feature 側で包む。**
+If communication, `dbc`, or a business judgment is needed, that is the `feature` layer. **Never bring business into ui — wrap it on the feature side.**
 
 ---
 
-## 4. props は層の語彙で名付ける
+## 4. Name props in the layer's vocabulary
 
-`ui` の props は**見た目の語彙**にする。業務語彙を持ち込むと、その瞬間に使い回せなくなる。
+A `ui` part's props use **the vocabulary of appearance**. The moment business vocabulary enters, it stops being reusable.
 
 ```php
 //	NG: ui が業務を知ってしまっている
@@ -162,14 +164,14 @@ scene / root  ──▶  feature  ──▶  parts  ──▶  ui
 </props>
 ```
 
-`feature` 層で `[[ui_label label=:user_name]]` のように**業務語彙を見た目語彙へ翻訳する**。
-この翻訳を行う場所が feature の責務である。
+**Translate business vocabulary into appearance vocabulary** in the `feature` layer, as in `[[ui_label label=:user_name]]`.
+Performing that translation is the feature's responsibility.
 
 ---
 
-## 5. バリエーションは複製せず props で受ける
+## 5. Take variants as props rather than duplicating
 
-**色違い・サイズ違いのためにファイルを複製しない。**
+**Never duplicate a file for a color or size variant.**
 
 ```php
 //	NG: 複製する
@@ -182,93 +184,90 @@ scene / root  ──▶  feature  ──▶  parts  ──▶  ui
 [[ui_button label="削除" variant="danger" size="small"]]
 ```
 
-受けた値は class に落とし、見た目は `<style>` 側で決める（[viewpart-dataflow.md](./viewpart-dataflow.md) §3）。
-`<style>` はパーツ名で自動スコープされるので、**1 ファイルに集約すれば CSS も 1 箇所に閉じる**。
+Land the received value on a class and let `<style>` decide the appearance ([viewpart-dataflow.md](./viewpart-dataflow.md) §3).
+`<style>` is auto-scoped by part name, so **consolidating into one file closes the CSS in one place too**.
 
 ---
 
-## 6. 切り出しの判断：2 箇所目で共通化する
+## 6. When to carve out: share it at the second site
 
-- **1 箇所でしか使っていないうちは切り出さない。** 使われ方が 1 つしか分からない段階で共通化すると、
-  2 つ目の要求で props が肥大し、かえって読めなくなる
-- **2 箇所目が現れた時点で切り出す。** コピーして 2 つ目を作らない。これが「同じものが別々に定義される」の起点になる
-- **書き始める前に、必ず既存を探す。** 新しい見た目に着手する前に `app/viewparts/` 配下を
-  `ui_` 前置のパーツ名で検索し、同等のものが無いか確認する。探さずに書き始めること自体が重複定義の起点になる
+- **Do not carve it out while only one place uses it.** Sharing something when you know only one way it is used swells the props on the second demand and makes it less readable, not more
+- **Carve it out the moment a second site appears.** Never copy to make the second one — that is the origin of "the same thing defined separately"
+- **Always search for an existing one before you start writing.** Before starting on a new appearance, search under `app/viewparts/` for `ui_`-prefixed part names and check nothing equivalent exists. Starting to write without searching is itself the origin of duplicate definitions
 
-初出のパーツは**使っている場所に置く**（§1 の住所の表）。ここで先に `_common_/` へ置かない。
-1 箇所しか使われていないものを最広の階層に置くと、共有範囲が読めなくなる。
+Put a part's first appearance **where it is used** (the location table in §1). Do not put it in `_common_/` preemptively.
+Putting something used in one place at the widest level makes the scope of sharing unreadable.
 
-### 引き上げるときは置き場も上げる
+### When you promote it, raise the location too
 
-共有範囲が広がったら、階層を 1 段上げる。**層は変わらず、住所だけが変わる。**
+When the scope of sharing widens, raise it one level. **The layer does not change; only the location does.**
 
 ```
 [role]/[module]/[action]/  →  [role]/[module]/_common_/  →  [role]/_common_/  →  _common_/
 ```
 
-> **同名パーツは後勝ちで上書きされる。** 上の階層へ引き上げたら、下の階層に残った同名ファイルを**必ず消す**。
-> 残すと、どちらが効いているのか読めないまま片方だけを直す事故が起きる。
+> **A same-named part later in the scan order overwrites the earlier.** Once you promote to an upper level, **always delete** the same-named file left at the lower level.
+> Leaving it causes the accident of fixing only one of them while it is unreadable which is in effect.
 
 ---
 
-## 7. CSS の重複を作らない
+## 7. Never create duplicate CSS
 
-- **同じ見た目のルールを 2 つのパーツの `<style>` に書かない。** 重複を見つけたら、その見た目は ui パーツである
-- 色・余白・フォントサイズなどの**トークンは `app/assets/css/` 側の変数**に置き、各パーツの `<style>` から参照する
-  （解決順は `[role]/` → `[role]/_common_/` → `_common_/` → `engine/assets/css/`）
-- パーツの `<style>` に生の色コードを直書きしない。トークンが無いなら、まずトークンを足す
-- レイアウト（配置・間隔）は**使う側**が持ち、ui パーツ自身は外側の余白を持たない。
-  ui に `margin` を持たせると、置き場所ごとに上書きが必要になり再利用できなくなる
-- **`<style>` の宣言は自分のルート class の配下に閉じる。** スコープは部分一致で、
-  マウント先の親要素にも自分のパーツ名が付くため、トップレベルの素の宣言は親や兄弟へ漏れる
-  （[viewpart.md](./viewpart.md) §7）。使い回される ui / parts ほど被害が広がる
-
----
-
-## 8. scene / root は構成だけを持つ
-
-画面パーツに見た目を書き溜めない。
-
-- `scene` の `<template>` は、feature / parts を並べるだけの構成に留める
-- `scene` の `<style>` はレイアウト（グリッド・領域分割）だけ。部品の見た目は下位層に置く
-- `<method>` に業務ロジックが溜まってきたら、それは feature パーツへ切り出す合図
+- **Never write the same appearance rule in two parts' `<style>`.** When you find a duplicate, that appearance is a ui part
+- Put **tokens** — colors, spacing, font sizes — in variables on the `app/assets/css/` side and reference them from each part's `<style>`
+  (resolution order is `[role]/` → `[role]/_common_/` → `_common_/` → `engine/assets/css/`)
+- Never hardcode a raw color into a part's `<style>`. If there is no token, add the token first
+- Layout (placement, spacing) is held by **the user**, and a ui part carries no outer margin of its own.
+  Give a ui part a `margin` and every placement needs an override, and it stops being reusable
+- **Close `<style>` declarations beneath your own root class.** The scope is a partial match, and
+  the parent element you mount into also receives your part name, so a bare top-level declaration leaks to the parent and siblings
+  ([viewpart.md](./viewpart.md) §7). The more reusable the ui / parts, the wider the damage
 
 ---
 
-## 9. backend（action / model）との境界
+## 8. scene / root hold composition only
 
-FE 内の層分け（§1–§3）に加え、**サーバ側の責務**との線を守る。
-backend の正本は [backend/coding.md](../backend/coding.md) §1.1（境界）・[backend/action.md](../backend/action.md)（action = ユースケース）・[backend/model.md](../backend/model.md)（model = Domain）。
+Never let appearance accumulate in a screen part.
 
-### 9.1 だれが何を持つか
+- A `scene`'s `<template>` stays a composition that merely lines up features and parts
+- A `scene`'s `<style>` is layout only (grids, region division). Component appearance goes to the lower layers
+- Business logic accumulating in `<method>` is the signal to carve out a feature part
 
-| 関心 | 置き場所 | 備考 |
+---
+
+## 9. The boundary with the backend (action / model)
+
+On top of the FE's internal layering (§1–§3), hold the line against **the server side's responsibilities**.
+The backend is authoritative in [backend/coding.md](../backend/coding.md) §1.1 (the boundary), [backend/action.md](../backend/action.md) (the action = the use case), and [backend/model.md](../backend/model.md) (the model = Domain).
+
+### 9.1 Who holds what
+
+| Concern | Where it goes | Note |
 | --- | --- | --- |
-| 権限・状態ゲート・保存可否・競合など**業務判定** | **サーバ**（model が意味、action が進行） | FE だけではバイパスできるので正にしない |
-| UX 用の事前チェック（空欄・連打防止・確認ダイアログ） | **feature** | 最終判定は必ずサーバ |
-| **契約レスポンスの束ね**（`exit_ok` の payload 形） | **action** | Domain ではない。model に画面専用を入れない |
-| **共有の表示ラベル・表示名など**（契約に載る） | **サーバ**（presenter → 契約） | FE は再導出せず提示する。詳細は backend §3.11 |
-| **画面固有の見せ方・画面上の並び** | **feature / scene** | 契約上の一覧行順はサーバ（SQL）が正。FE は正順を壊さない見せ方だけ |
-| 契約に沿った通信・`dbc` への反映 | **feature**（原則） | ui / parts は通信しない（§3）。scene は §9.2 |
-| リクエストボディの組み立て | **feature** | 契約のキー／型に沿う。ui / parts は props で値を上げるだけ |
-| `exit_ng` 等のエラー文言 | **サーバが正。feature は提示** | 業務意味を FE で言い換え・握りつぶししない |
+| **Business decisions** — permissions, state gates, whether a save is allowed, conflicts | **the server** (the model holds the meaning, the action the flow) | the FE alone can be bypassed, so never make it authoritative |
+| Pre-checks for UX (empty fields, double-click prevention, confirmation dialogs) | **feature** | the final decision is always the server's |
+| **Assembling the contract response** (the shape of `exit_ok`'s payload) | **the action** | not Domain. Never put screen-only concerns in a model |
+| **Shared display labels and display names** (going on the contract) | **the server** (presenter → contract) | the FE presents without re-deriving. Details in backend §3.11 |
+| **Screen-specific presentation and on-screen ordering** | **feature / scene** | the contractual list row order is authoritative on the server (SQL). The FE only presents in ways that do not break that order |
+| Contract-conformant communication and reflecting into `dbc` | **feature** (as a rule) | ui / parts never communicate (§3). scene is §9.2 |
+| Assembling the request body | **feature** | conform to the contract's keys and types. ui / parts only lift values up via props |
+| Error wording such as from `exit_ng` | **the server is authoritative; the feature presents it** | never let the FE reword or swallow a business meaning |
 
-backend 正本は [backend/coding.md](../backend/coding.md) §1・[backend/action.md](../backend/action.md) §2・[backend/model.md](../backend/model.md) §3.11。
-**契約に載った共有表示値は FE で再導出せず使う。載せない画面固有のラベル／見せ方だけ FE。**
+The backend is authoritative in [backend/coding.md](../backend/coding.md) §1, [backend/action.md](../backend/action.md) §2, and [backend/model.md](../backend/model.md) §3.11.
+**A shared display value that went on the contract is used by the FE, not re-derived. Only the screen-specific labels and presentation that do not go on it are the FE's.**
 
-### 9.2 通信してよい層
+### 9.2 Which layers may communicate
 
 ```
-scene / root  ──条件付き──▶  feature  ──通信しない──▶  parts  ──▶  ui
+scene / root  ──conditionally──▶  feature  ──never──▶  parts  ──▶  ui
 ```
 
-- **通信（ajax）・`dbc` の読み書きの原則は feature。** ui / parts は禁止（§3）。
-- **scene / root が ajax してよいのは**、その画面にまだ feature が無く構成だけで足りる薄い画面のとき、
-  またはルートが一括で持つ横断状態の初期取得に限る。業務の一覧・更新は feature へ切り出す。
-- 一覧取得・更新・削除の呼び出し、レスポンスの `dbc.set*`、エラー表示は feature に閉じるのが基本。
-- 発行前ゲート・世代管理・成功時の載せ方は [viewpart-dataflow.md](./viewpart-dataflow.md)「通信と応答の適用」。
+- **Communication (ajax) and reading/writing `dbc` belong to the feature as a rule.** ui / parts are forbidden (§3).
+- **`scene` / `root` may do ajax only** on a thin screen that has no feature yet and where composition alone suffices, or for the initial fetch of cross-cutting state the root holds as a whole. Business lists and updates get carved out into a feature.
+- Calls for fetching, updating, and deleting a list, the `dbc.set*` of the response, and error display are basically closed inside the feature.
+- Pre-issue gates, generation management, and how to land a success are in [viewpart-dataflow.md](./viewpart-dataflow.md), "Communication and applying the response".
 
-### 9.3 リクエストとレスポンス
+### 9.3 Request and response
 
 ```php
 //  ui / parts — 値を上げるだけ（契約キーを知らない）
@@ -283,38 +282,38 @@ let request =
 //  … ajax → 成功なら dbc / props を更新、失敗ならサーバ文言を表示
 ```
 
-- 成功時: 契約の payload を props / `dbc` に載せる。
-  契約に載った共有表示値は再導出せず使う。画面固有の見せ方・並びだけ feature 側。
-- 失敗時: サーバが返したメッセージを**そのまま（または契約どおり）表示**する。
-  「担当外」を FE が別文言に invent しない。
+- On success: land the contract's payload onto props / `dbc`.
+  A shared display value that went on the contract is used, not re-derived. Only screen-specific presentation and ordering are the feature's.
+- On failure: **display the message the server returned as-is (or per the contract)**.
+  Never let the FE invent different wording for "out of scope".
 
-### 9.4 やらないこと
+### 9.4 What not to do
 
-- feature に「サーバと同じ」業務判定を正として二重実装する（UX 事前チェックは可）。
-- ui / parts から ajax / `dbc` / 契約キー組み立てをする。
-- `exit_ng` 文言を握りつぶして成功扱いにする。
-- 1 表の意味・権限の正を FE の props だけに置く。
+- Reimplement, in a feature, a business decision "the same as the server's" as authoritative (a UX pre-check is fine).
+- Do ajax / `dbc` / contract-key assembly from ui / parts.
+- Swallow an `exit_ng` message and treat it as a success.
+- Keep the authority on one table's meaning or permissions in the FE's props alone.
 
 ---
 
-## ✅ コンポーネント設計の確認
+## ✅ Checking a component design
 
-- [ ] 新しい見た目を書く前に、既存の ui / parts を探したか
-- [ ] コピーして 2 つ目を作っていないか（2 箇所目は共通化する）
-- [ ] 置き場が「実際に使われている範囲の最小の階層」になっているか（先に `_common_/` へ置いていないか）
-- [ ] 層がパーツ名から読めるか（`ui` は必須の `ui/`・`ui_`。parts/feature は §1 の推奨命名）
-- [ ] 前方一致するパーツ名を作っていないか（`ui_button` と `ui_button_group`）
-- [ ] `ui` / `parts` が `dbc` / `g` / 通信 / `postup` に触れていないか
-- [ ] `ui` の props が見た目の語彙になっているか（業務語彙が漏れていないか）
-- [ ] バインドしている prop がすべて `<props>` に宣言されているか
-- [ ] 色違い・サイズ違いをファイル複製で作っていないか
-- [ ] 下位層が上位層のパーツ名を参照していないか
-- [ ] 同じ CSS ルールが複数パーツの `<style>` に重複していないか
-- [ ] `<style>` の宣言が自分のルート class の配下に閉じているか
-- [ ] 生の色コードを `<style>` に直書きしていないか
-- [ ] ui パーツが外側の余白（`margin`）を持っていないか
-- [ ] 階層を引き上げた後、下の階層に同名ファイルが残っていないか
-- [ ] `scene` の `<template>` が構成だけに収まっているか
-- [ ] 業務判定の正がサーバにあり、feature は UX 事前チェックに留まっているか
-- [ ] 通信・リクエスト組み立て・`dbc` 反映が feature（または scene）に閉じているか
-- [ ] サーバエラー文言を言い換え・握りつぶししていないか
+- [ ] Did you search the existing ui / parts before writing a new appearance?
+- [ ] Are you making the second one by copying? (share it at the second site)
+- [ ] Is the location "the shallowest level covering the range actually in use"? (did you put it in `_common_/` preemptively?)
+- [ ] Is the layer readable from the part name? (`ui` requires `ui/` and `ui_`; parts/feature follow §1's recommended naming)
+- [ ] Have you created prefix-matching part names? (`ui_button` and `ui_button_group`)
+- [ ] Do `ui` / `parts` touch `dbc` / `g` / communication / `postup`?
+- [ ] Are `ui`'s props in the vocabulary of appearance? (has business vocabulary leaked in?)
+- [ ] Is every bound prop declared in `<props>`?
+- [ ] Are you making color or size variants by duplicating files?
+- [ ] Does a lower layer reference an upper layer's part name?
+- [ ] Is the same CSS rule duplicated across several parts' `<style>`?
+- [ ] Are `<style>` declarations closed beneath your own root class?
+- [ ] Have you hardcoded a raw color into `<style>`?
+- [ ] Does a ui part carry an outer margin?
+- [ ] After promoting a level, is a same-named file left at the lower level?
+- [ ] Does the `scene`'s `<template>` stay within composition?
+- [ ] Is the authority on business decisions on the server, with the feature confined to UX pre-checks?
+- [ ] Are communication, request assembly, and `dbc` reflection closed inside the feature (or the scene)?
+- [ ] Have you reworded or swallowed a server error message?

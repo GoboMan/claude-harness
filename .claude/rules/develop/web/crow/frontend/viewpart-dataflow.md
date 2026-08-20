@@ -6,33 +6,35 @@ paths:
   - "**/crow3_*/app/assets/js/**"
 ---
 
-# 🔀 crow / frontend — ビューパーツのデータフローと宣言的な書き方
+# 🔀 crow / frontend — viewpart data flow and the declarative style
 
-> パーツの構造規約は [viewpart.md](./viewpart.md)。本書は**状態をどう持ち、どう流すか**を定める。
-> 狙いは「読んで挙動が分かる」こと ＝ 手続きの順序を追わなくても、状態とテンプレートを見れば画面が決まる状態にすること。
-
----
-
-## 0. 到達点の定義（crow でできること・できないこと）
-
-crow のビューパーツは **React ではない**。仮想 DOM も再レンダも差分適用も存在せず、
-条件レンダリング・リストレンダリング・イベントの宣言的ディレクティブも無い。
-リアクティビティは props への細粒度バインドで実現されている。
-
-**したがって「React のように書く」を目標にしない。** 目標は次の 2 つに絞る。
-
-1. **状態が唯一の真実であり、画面はその導出物である**という関係を崩さない
-2. **データは親から子へ、イベントは子から親へ**の単一方向に固定する
-
-1 つめは crow の実装がすでに支えている。`:` によるプロパティバインドは親→子の一方向で、逆流路を持たない。
-2 つめは **props でクロージャを渡し、子はそれを呼ぶだけ**という形で実現する（§5）。
-**ルールの役目は、機構として空いている抜け道を塞ぐことにある。**
+> The structural rules for a part are [viewpart.md](./viewpart.md). This document defines **how state is held and how it flows**.
+> The aim is "you can read it and know the behavior" — that the screen is determined by the state and the template, without tracing an order of procedures.
+>
+> **Write comments and user-facing text in Japanese.**
 
 ---
 
-## 1. 状態が唯一の真実（DOM から状態を読まない）
+## 0. Defining the goal (what crow can and cannot do)
 
-**画面の現在値を DOM から読み取らない。** 状態は必ず props 側にあり、DOM はその写像とする。
+A crow viewpart **is not React**. There is no virtual DOM, no re-render, no diff application, and
+no declarative directives for conditional rendering, list rendering, or events.
+Reactivity is realized through fine-grained binding to props.
+
+**So do not set "write it like React" as the goal.** Narrow the goal to these two:
+
+1. Never break the relation that **state is the single truth and the screen is derived from it**
+2. Fix the direction: **data flows parent to child, events flow child to parent**
+
+crow's implementation already supports the first. Property binding via `:` is one-way, parent to child, with no return path.
+The second is realized by **passing a closure as a prop and having the child merely call it** (§5).
+**The rules exist to close the loopholes the mechanism leaves open.**
+
+---
+
+## 1. State is the single truth (never read state from the DOM)
+
+**Never read the screen's current value from the DOM.** State always lives on the props side; the DOM is its projection.
 
 ```php
 //	NG: DOM を状態源にしている
@@ -43,10 +45,10 @@ if( name === "" ) { ... }
 if( self.prop('name') === "" ) { ... }
 ```
 
-入力要素は `bind_input` / `bind_checked` で props と結ぶ。これは **DOM ⇄ 自分の props** の局所的な双方向であり、
-フォーム入力に必要なので許可する。**親の props とは結ばない。**
+Tie input elements to props with `bind_input` / `bind_checked`. That is a local two-way binding **between the DOM and your own props**,
+and it is permitted because form input needs it. **Never tie it to the parent's props.**
 
-画面を変えたい時は **DOM ではなく props を変更する**。
+When you want to change the screen, **change the props, not the DOM**.
 
 ```php
 //	NG: DOM を直接書き換える（次の再描画で失われ、状態と食い違う）
@@ -58,23 +60,23 @@ self.prop('status_label', "完了");
 
 ---
 
-## 2. テンプレートで宣言できるものはテンプレートに書く
+## 2. Whatever can be declared in the template is written in the template
 
-`<ready>` や `<method>` で HTML を組み立てない。**`innerHTML` への文字列代入は禁止**（詳細は [viewpart.md](./viewpart.md) §5）。
+Never assemble HTML in `<ready>` or `<method>`. **Assigning a string to `innerHTML` is forbidden** (details in [viewpart.md](./viewpart.md) §5).
 
-宣言できるのは次の 4 つ。これで表現できる範囲は必ずこれで書く。
+There are 4 things that can be declared. Whatever they can express is always written with them.
 
-| 記法 | 意味 |
+| Notation | Meaning |
 | --- | --- |
-| `{{ prop }}` | テキスト補間（HTML エスケープあり） |
-| `{{{ prop }}}` | テキスト補間（エスケープなし）。**信頼できる値だけ** |
-| `attr=":prop"` / `attr="::"` | 属性バインド（`::` は同名バインド） |
-| `[[part arg=:prop]]` | 子パーツの埋め込み ＋ プロパティバインド |
+| `{{ prop }}` | text interpolation (HTML-escaped) |
+| `{{{ prop }}}` | text interpolation (unescaped). **Only for trusted values** |
+| `attr=":prop"` / `attr="::"` | attribute binding (`::` binds the same name) |
+| `[[part arg=:prop]]` | embedding a child part + property binding |
 
-### `{{ }}` は「その要素だけのテキスト」に使う
+### Use `{{ }}` for "the text of that element alone"
 
-補間の抽出は「タグの中身がテキストである」形を前提にしている。
-**別のタグを挟むと、意図しない範囲まで巻き込んで壊れる。**
+Extraction for interpolation presupposes the shape "the tag's content is text".
+**Interposing another tag drags in an unintended range and breaks it.**
 
 ```php
 <!--  NG: 内側に別タグがある  -->
@@ -84,17 +86,17 @@ self.prop('status_label', "完了");
 <p>こんにちは <span>{{ name }}</span> <b>さん</b></p>
 ```
 
-**補間する値には必ず専用の要素を与える**、と覚える。
+Remember it as: **always give an interpolated value its own dedicated element.**
 
 ---
 
-## 3. 表示の切り替えは class バインドで表す
+## 3. Express display switching with a class binding
 
-crow に条件レンダリングのディレクティブは無い。表示・非表示や状態差分は
-**class をバインドし、見た目は `<style>` 側で決める**。
+crow has no conditional-rendering directive. Show/hide and state differences are expressed by
+**binding a class and letting `<style>` decide the appearance**.
 
-「状態 → class → 見た目」の一本道にすると、状態と CSS を見るだけで画面が決まり、
-表示ロジックが `<ready>` に散らばらない。
+Making it a single path "state → class → appearance" means the screen is determined by looking at the state and the CSS alone,
+and display logic does not scatter into `<ready>`.
 
 ```php
 <props>
@@ -127,10 +129,10 @@ crow に条件レンダリングのディレクティブは無い。表示・非
 </style>
 ```
 
-### 例外：挙動を持つ真偽属性は直接バインドする
+### The exception: boolean attributes with behavior are bound directly
 
-`checked` / `required` / `disabled` / `readonly` の 4 つは、**class では代替できない挙動**を持つ。
-これらだけは真偽値の prop を直接バインドしてよい。
+The four `checked` / `required` / `disabled` / `readonly` carry **behavior that a class cannot substitute for**.
+These alone may have a boolean prop bound directly.
 
 ```php
 <template>
@@ -139,17 +141,17 @@ crow に条件レンダリングのディレクティブは無い。表示・非
 </template>
 ```
 
-**この 4 つ以外の属性を表示制御に使わない。** 見た目の差はすべて class に寄せる。
+**Never use any attribute other than these four for display control.** Every visual difference goes onto a class.
 
 ---
 
-## 4. リストは「状態 → 単一の描画メソッド」に集約する
+## 4. Consolidate a list into "state → a single render method"
 
-crow にリストレンダリングのディレクティブは無いので描画は手続きになるが、
-**呼ばれる場所を 1 箇所に固定すれば宣言的な性質は保てる。**
+crow has no list-rendering directive, so rendering becomes procedural — but
+**fixing the place it is called from to exactly one keeps the declarative character.**
 
-原則：**イベントハンドラから直接 DOM に子を積まない。イベントは状態を変えるだけ。**
-状態の変化を `<watch>` が拾い、描画メソッドを 1 つだけ呼ぶ。
+The principle: **never stack children onto the DOM directly from an event handler. An event only changes state.**
+`<watch>` picks up the state change and calls exactly one render method.
 
 ```php
 <props>
@@ -202,28 +204,28 @@ crow にリストレンダリングのディレクティブは無いので描画
 </method>
 ```
 
-- **初回描画は `<ready>` で起こす。** `<watch>` は変更時にしか走らないので、これが無いと
-  「生成時に `args_` で渡されたデータが描画されない」という事故になる
-- 子の破棄は `remove_pref()` を使い、**リストの全行に同じ pref** を付ける（[viewpart.md](./viewpart.md) §2）
-- 配列の中身を書き換えた場合は参照が変わらず watch が発火しないので、`self.update('rows')` で明示的に発火させる
-- 差分更新（key による再利用）は crow に無い。**件数が多く全消し全作りが重い場合だけ**、
-  局所的な差分更新を `<method>` 内に閉じて書く（呼び出し口は 1 箇所のまま保つ）
+- **Kick off the first render in `<ready>`.** `<watch>` runs only on change, so without this you get the accident that
+  "data passed via `args_` at creation is never rendered"
+- Dispose children with `remove_pref()`, giving **every row in the list the same pref** ([viewpart.md](./viewpart.md) §2)
+- If you mutate an array's contents, the reference does not change and watch does not fire — fire it explicitly with `self.update('rows')`
+- Diff updates (reuse by key) do not exist in crow. **Only when the row count is high and full teardown-and-rebuild is heavy**,
+  write a local diff update closed inside `<method>` (keeping the single call site)
 
 ---
 
-## 5. 単一方向データフロー（親子の契約）
+## 5. One-way data flow (the parent/child contract)
 
 ```
-        props（値）
-   親 ───────────────▶ 子
-   親 ───────────────▶ 子   props（クロージャ）
-   親 ◀─────────────── 子   子はそのクロージャを呼ぶだけ
+        props (values)
+   parent ───────────────▶ child
+   parent ───────────────▶ child   props (closures)
+   parent ◀─────────────── child   the child merely calls that closure
 ```
 
-**下りも上りも経路は props 1 本**。値もイベントも同じ道を通るので、
-親のテンプレートと生成コードだけを見れば、その子との契約が全部読める。
+**Both down and up go through the single path of props.** Values and events travel the same road, so
+looking only at the parent's template and creation code reveals the whole contract with that child.
 
-### 下り：親 → 子は props で渡す
+### Down: parent → child is passed as props
 
 ```php
 <!--  ":" は継続バインド（親の変更が子へ流れ続ける）。属性名が子の prop 名になる  -->
@@ -236,22 +238,22 @@ crow にリストレンダリングのディレクティブは無いので描画
 [[user_card editable="true"]]
 ```
 
-> **`@` は属性名を見ない。** 参照した prop 名がそのまま子の prop 名になるため、
-> `[[user_card name=@user_name]]` は子の `name` を**セットせず**、`user_name` というキーを注入する。
-> **名前を一致させないと値が届かない。** 名前を変えて渡したい場合は `:` を使う。
+> **`@` does not look at the attribute name.** The referenced prop name becomes the child's prop name directly, so
+> `[[user_card name=@user_name]]` **does not set** the child's `name` — it injects a key called `user_name`.
+> **Unless the names match, the value does not arrive.** Use `:` when you want to pass it under a different name.
 
-動的に生成する子には `create_child*` の `args_` で渡す。後から親が値を変えたい場合のみ `bind_prop()` を使う。
+For dynamically created children, pass values through `create_child*`'s `args_`. Use `bind_prop()` only when the parent wants to change the value later.
 
-> **渡すのは参照である。** `:` バインドも `args_` もオブジェクト・配列を**コピーせずそのまま**渡す。
-> 子が中身を破壊的に変更すると**親のデータがそのまま書き換わり、しかも watch も発火しない**（後述の禁止事項）。
+> **What you pass is a reference.** Both `:` binding and `args_` pass objects and arrays **as-is, without copying**.
+> If the child mutates the contents destructively, **the parent's data is rewritten directly, and watch does not even fire** (see the prohibitions below).
 
-### 上り：子 → 親は、親から渡されたクロージャを呼ぶ
+### Up: child → parent calls a closure the parent passed down
 
-**`postup` / `postdown` は既定では使わない**（例外は後述）。
-処理の実体は親が持ち、**子にはそれを呼ぶための関数を prop として渡す**。
-子は「自分に何が起きたか」を伝えるだけで、親がそれで何をするかは知らない。
+**Do not use `postup` / `postdown` by default** (the exception is below).
+The parent holds the substance of the processing, and **the child is passed a function to call it as a prop**.
+The child only conveys "what happened to me"; it does not know what the parent does with that.
 
-**親：処理の実体を `<method>` に置く**
+**Parent: the substance of the processing goes in `<method>`**
 
 ```php
 <method>
@@ -265,7 +267,7 @@ crow にリストレンダリングのディレクティブは無いので描画
 </method>
 ```
 
-**親：動的に作る子には、生成時の `args_` で渡す**
+**Parent: for dynamically created children, pass it in `args_` at creation**
 
 ```php
 <ready>
@@ -283,7 +285,7 @@ crow にリストレンダリングのディレクティブは無いので描画
 </ready>
 ```
 
-**親：テンプレートに埋め込む子には、prop 経由で渡す**
+**Parent: for children embedded in the template, pass it via a prop**
 
 ```php
 <props>
@@ -307,14 +309,14 @@ crow にリストレンダリングのディレクティブは無いので描画
 </init>
 ```
 
-> テンプレート埋め込みの子は**親の `<init>` より先に生成される**ため、生成の瞬間は `null` が入っている。
-> `:` の継続バインドによって `<init>` での代入が子へ流れる。ここから 2 つの制約が出る。
+> Children embedded in a template **are created before the parent's `<init>`**, so at the moment of creation `null` is in place.
+> The `:` continuous binding carries the assignment made in `<init>` down to the child. Two constraints follow.
 >
-> - **子は `<init>` の中でクロージャを呼んではいけない**（まだ届いていない）
-> - **親は `<init>` で `watch_stop()` してはいけない**。停止中は `:` バインドの伝播も止まるため、
->   クロージャが子へ永久に届かなくなる（[viewpart.md](./viewpart.md) §3）
+> - **A child must never call the closure inside its `<init>`** (it has not arrived yet)
+> - **A parent must never `watch_stop()` in `<init>`.** While stopped, `:` binding propagation also stops, so
+>   the closure never reaches the child ([viewpart.md](./viewpart.md) §3)
 
-**子：受け取って呼ぶだけ**
+**Child: receive it and just call it**
 
 ```php
 <props>
@@ -336,26 +338,26 @@ crow にリストレンダリングのディレクティブは無いので描画
 </ready>
 ```
 
-### クロージャ props の規約
+### Rules for closure props
 
-- **名前は `on_` ＋ 起きた事実。** `on_select` / `on_close_requested` のように**子で何が起きたか**で名付ける。
-  `on_delete_user` のように**親が何をするか**で名付けない（子が親の都合を知ってしまう）
-- **`<props>` の中でクロージャを定義しない。** props セクションには `self` が存在しないため、
-  そこで書いた関数は自分のパーツに触れない。`null` で枠だけ宣言し、`<init>` で実体を入れる
-- **子は呼ぶだけ。戻り値に依存しない。** 親がどう処理したかを子が知る必要はない
-- **渡す引数は最小限の値にする。** DOM 要素・イベントオブジェクト・自分自身のインスタンスを渡さない
-- **未設定を許容する。** 呼ぶ前に `null` を確認し、無ければ何もしない
-- **バケツリレーが 3 階層を超えたら設計を疑う。** 中間パーツが素通しするだけのクロージャが積み上がってきたら、
-  その状態は共通の祖先ではなく `dbc` へ寄せる
+- **Name them `on_` + the fact that happened.** Name them for **what happened in the child**, as in `on_select` / `on_close_requested`.
+  Never name them for **what the parent does**, as in `on_delete_user` (that makes the child know the parent's business)
+- **Never define a closure inside `<props>`.** `self` does not exist in the props section, so
+  a function written there cannot touch its own part. Declare the slot as `null` and put the substance in from `<init>`
+- **The child only calls it. It never depends on the return value.** The child has no need to know how the parent handled it
+- **Pass the minimum values as arguments.** Never pass DOM elements, event objects, or your own instance
+- **Tolerate it being unset.** Check for `null` before calling, and do nothing if absent
+- **Doubt the design once the bucket brigade exceeds 3 levels.** When closures that intermediate parts merely pass through start piling up,
+  that state belongs in `dbc` rather than in a common ancestor
 
-### 例外：横断的な通知だけ postup / `<recv>` を使う
+### The exception: use postup / `<recv>` only for cross-cutting notifications
 
-**画面のどこからでも上げる必要があり、受け手がルートに 1 つしかない**通知に限って `postup` を使う。
-典型はエラーダイアログとメッセージ表示で、中間の全パーツにクロージャを通すのが不合理なケースである。
+Use `postup` only for a notification that **must be raisable from anywhere on the screen and has exactly one receiver at the root**.
+The typical cases are the error dialog and message display, where threading a closure through every intermediate part is unreasonable.
 
-**発信してよいのは feature 以上（feature / scene / root）だけ。**
-`ui` / `parts` は `postup` 禁止（クロージャ props で親へ返す。
-[viewpart-components.md](./viewpart-components.md) §3）。
+**Only feature and above (feature / scene / root) may emit.**
+`ui` / `parts` are forbidden from `postup` (they return to the parent via closure props —
+[viewpart-components.md](./viewpart-components.md) §3).
 
 ```php
 //	feature 以上: 横断的な通知だけは postup を使う
@@ -378,84 +380,84 @@ self.postup('error', ["E001", "保存に失敗しました"]);
 </recv>
 ```
 
-受信ハンドラの第 1 引数は**発信元インスタンス固定**、第 2 引数が `postup` に渡したパラメータ。
-処理を完結させたら `true` を返して伝播を止める（返さないと祖先まで上り続ける）。
+The receive handler's first argument is **fixed as the emitting instance**; the second is the parameters passed to `postup`.
+Once you have handled it fully, return `true` to stop the propagation (without it, it keeps climbing to the ancestors).
 
-**使うときは `<recv>` 側に「なぜ横断なのか」をコメントで残す。**
-理由が書けないなら、それはクロージャで渡すべきイベントである。
+**When you use it, leave a comment on the `<recv>` side explaining why it is cross-cutting.**
+If you cannot write the reason, it is an event that should have been passed as a closure.
 
-### 禁止事項（機構としては可能だが、単一方向を壊すもの）
+### Prohibitions (mechanically possible, but they break one-way flow)
 
-- **子から親の状態を書き換えない。** `self.parent().prop(...)` / `self.parent().jq(...)` を書かない。
-  `parent()` は public なので機構上は可能だが、これをやると変更元が追えなくなる。
-  子は**渡されたクロージャを呼ぶだけ**にする
-- **子は親から受け取った prop を書き換えない。** 再代入しても親には伝わらず、親の変更で上書きされる。
-  さらに**オブジェクト・配列は参照が共有されている**ので、中身を書き換えると
-  **親のデータが静かに汚染され、watch も発火しない**（最も追いにくい壊れ方になる）。
-  加工したい場合は**別名の prop を用意して `<watch>` で導出する**
-- **兄弟パーツを直接参照しない。** `viewpart_find_by_name()` / `viewpart_find_all_by_name()` で兄弟を掴んで
-  操作しない。共通の親でクロージャを受け、親が `pref()` 経由でもう一方の子へ反映する
-- **孫を直接掴まない。** `self.pref('a').pref('b')` のような連鎖参照を書かない。1 階層ずつ責務を委ねる
+- **A child never rewrites the parent's state.** Never write `self.parent().prop(...)` / `self.parent().jq(...)`.
+  `parent()` is public so the mechanism allows it, but doing so makes the source of a change untraceable.
+  A child **only calls the closure it was passed**
+- **A child never rewrites a prop it received from the parent.** Reassigning does not reach the parent and gets overwritten by the parent's next change.
+  Worse, **objects and arrays share a reference**, so mutating the contents
+  **quietly contaminates the parent's data without firing watch** (the hardest breakage to trace).
+  When you want to transform something, **prepare a differently named prop and derive it in `<watch>`**
+- **Never reference a sibling part directly.** Never grab a sibling with `viewpart_find_by_name()` / `viewpart_find_all_by_name()`
+  and operate on it. Receive a closure at the common parent and have the parent reflect it onto the other child via `pref()`
+- **Never grab a grandchild directly.** Never write a chained reference like `self.pref('a').pref('b')`. Delegate responsibility one level at a time
 
-### 広域で共有する状態は dbc に置く
+### State shared broadly goes in dbc
 
-祖先が遠い・画面をまたぐ状態は、共通祖先へ持ち上げずに `dbc`（データキャッシュ）を使う。
+For state whose ancestor is distant, or that spans screens, use `dbc` (the data cache) rather than lifting it to a common ancestor.
 
 ```php
 //	dbc の値をパーツの prop にバインドする
 dbc.bind("user.list", user_id, self, "user_row");
 ```
 
-- **`dbc.bind()` は dbc → prop の一方向である**（prop を変えても dbc は変わらない）。
-  更新は必ず `dbc.set()` / `dbc.set_list()` / `dbc.merge_list()` 経由で行い、prop を直接書き換えない
-- **バインドはパーツ破棄時に自動で解除される。** 明示的な `dbc.unbind(self, "prop名")` は、
-  画面に残したまま早めに外したい場合だけ書く
-- **`set_list()` は「新しいリストに含まれないキー」を消さない。** 全件リフレッシュで行が消えたとき、
-  バインド済みの prop は**古い値のまま残る**。消えた行を反映する必要があるなら、
-  `remove` 系を使うか、描画側で dbc のリストを引き直す
+- **`dbc.bind()` is one-way, dbc → prop** (changing the prop does not change dbc).
+  Always update through `dbc.set()` / `dbc.set_list()` / `dbc.merge_list()`; never rewrite the prop directly
+- **A binding is released automatically when the part is disposed.** Write an explicit `dbc.unbind(self, "prop name")`
+  only when you want to detach early while it is still on screen
+- **`set_list()` does not delete "keys absent from the new list".** When a row disappears in a full refresh,
+  a bound prop **stays at its old value**. If a disappeared row must be reflected, use the `remove` family
+  or re-pull the dbc list on the rendering side
 
-### 通信と応答の適用（ajax / 契約）
+### Communication and applying the response (ajax / the contract)
 
-誰が通信してよいかは [viewpart-components.md](./viewpart-components.md) §9（feature まで）。
-ここでは **出し方と応答の載せ方**を定める。
+Who may communicate is in [viewpart-components.md](./viewpart-components.md) §9 (feature and up).
+Here we define **how to issue it and how to land the response**.
 
-#### 発行前は fail-closed
+#### Fail closed before issuing
 
-必要条件（担当者・選択中行・契約必須キーなど）が揃うまで **ajax を出さない**。
-揃わないときは空表示やスケルトンに留め、**緩い条件で取りにいかない**
-（サーバの母集団強制や権限が黙って消える経路を作らない）。
+**Do not issue the ajax** until the required conditions (the assignee, the selected row, the contract's required keys) are in place.
+While they are not, stay on an empty state or a skeleton, and **do not go fetch under looser conditions**
+(never create a route where the server's population constraint or a permission quietly disappears).
 
-リクエスト組み立ては feature 内の **単一経路**（例: `build_*_request_params`）に寄せ、
-タブ・ページングなど全 UI 操作がそこを通るようにする。
+Consolidate request assembly into a **single path** within the feature (e.g. `build_*_request_params`),
+so that every UI operation — tabs, paging — goes through it.
 
-#### 成功時の載せ方
+#### How to land a success
 
-| データの性質 | 載せ先 |
+| Nature of the data | Where it lands |
 | --- | --- |
-| 画面内で複数パーツが共有する一覧・行 | `dbc.set` / `dbc.set_list` / `dbc.merge_list`。子は `dbc.bind` |
-| その feature だけの局所状態 | 自パーツの props |
+| A list or row shared by several parts within the screen | `dbc.set` / `dbc.set_list` / `dbc.merge_list`. Children use `dbc.bind` |
+| Local state belonging to that feature alone | that part's own props |
 
-- 成功コールバックで **DOM を直接組み立てて状態源にしない**（§1・§4）。
-  載せてから、既存の単一描画メソッド／子生成へ進む。
-- 契約の response 形に沿って載せる（キー名は機能の契約が正。
-  `rows` / `rows_with_id` / `pager` は**よくある例**であり必須キー一覧ではない）。
+- Never make DOM assembled directly in the success callback the source of state (§1, §4).
+  Land the data first, then proceed to the existing single render method or child creation.
+- Land it per the contract's response shape (key names are authoritative in the feature's contract;
+  `rows` / `rows_with_id` / `pager` are **common examples**, not a list of required keys).
 
-#### 陳腐化した応答を適用しない
+#### Never apply a stale response
 
-`ajax.post` 等は abort ハンドルを返さず、配送済みの応答も止められないことがある。
-連打・タブ切替では **リクエスト世代（seq）** を持ち、
+`ajax.post` and the like do not return an abort handle, and a response already delivered sometimes cannot be stopped.
+On rapid clicks and tab switches, carry a **request generation (seq)**, and:
 
-- 発行ごとに seq を進める
-- 応答適用前に「この応答は最新世代か」を判定する
-- **最新以外は一覧・状態へ書き込まない**（fail-closed）
+- advance the seq on every issue
+- decide, before applying a response, whether it belongs to the latest generation
+- **never write anything but the latest into the list or the state** (fail closed)
 
-陳腐化応答の失敗で、最新世代の一覧を空表示へ潰さない。
+Never let a stale response's failure crush the latest generation's list into an empty state.
 
-#### 失敗時
+#### On failure
 
-- サーバが返したメッセージを toast／画面エラーへ **提示**する（言い換え・握りつぶしは §9）。
-- 一覧を空にするか直前表示を残すかは機能仕様に従う。どちらかを明示し、曖昧にしない。
-- スケルトンを出しっぱなしにしない（失敗時も畳む）。
+- **Present** the message the server returned, as a toast or an on-screen error (rewording or swallowing is §9).
+- Whether to empty the list or keep the previous display follows the feature spec. State one of the two; never leave it ambiguous.
+- Never leave a skeleton up (fold it away on failure too).
 
 ```php
 //  概形（名前は機能に合わせる）
@@ -492,10 +494,10 @@ ajax_or_helper
 
 ---
 
-## 6. 手続きが許されるのは「イベント配線」だけ
+## 6. The only procedural code allowed is "event wiring"
 
-crow には宣言的なイベントディレクティブが無いので、`<ready>` での配線は避けられない。
-**ここだけを手続きの入口と認め、他へ広げない。**
+crow has no declarative event directive, so wiring in `<ready>` is unavoidable.
+**Recognize this as the sole entrance for procedural code, and never widen it.**
 
 ```php
 <ready>
@@ -513,31 +515,31 @@ crow には宣言的なイベントディレクティブが無いので、`<read
 </ready>
 ```
 
-`<ready>` に画面組み立て・分岐・ループが増えてきたら、それは状態設計の失敗の兆候である。
-**「その分岐は prop にできないか」を先に疑う。**
+Screen assembly, branches, and loops accumulating in `<ready>` are a sign the state design has failed.
+**First doubt it: "could that branch be a prop?"**
 
 ---
 
-## ✅ データフローの確認
+## ✅ Checking the data flow
 
-- [ ] 画面の値を DOM から読んでいないか（`.val()` / `.text()` を状態源にしていないか）
-- [ ] `innerHTML` への文字列代入や HTML の組み立てをしていないか
-- [ ] `{{ }}` を専用要素で包んでいるか（内側に別タグが無いか）
-- [ ] 表示制御を class バインドで書いているか（真偽属性 4 つ以外を切り替えていないか）
-- [ ] リストの初回描画が `<ready>` にあるか
-- [ ] リストの描画メソッドが 1 つで、イベントハンドラから直接 DOM に積んでいないか
-- [ ] 子が `self.parent()` で親を書き換えていないか
-- [ ] 子が親から受け取った prop を書き換えていないか（オブジェクトの中身を含む）
-- [ ] 兄弟・孫を直接参照していないか
-- [ ] `@` バインドで属性名と prop 名が一致しているか（不一致だと値が届かない）
-- [ ] 子 → 親の通知がクロージャ props になっているか（`postup` を既定で使っていないか）
-- [ ] クロージャ props が `on_` ＋ 起きた事実で命名されているか
-- [ ] クロージャを `<props>` の中で定義していないか（`null` 宣言 ＋ `<init>` で代入になっているか）
-- [ ] 子がクロージャを呼ぶ前に `null` を確認しているか／`<init>` で呼んでいないか
-- [ ] `postup` を使った箇所に「なぜ横断なのか」のコメントがあり、`true` で伝播を止めているか
-- [ ] `postup` の発信が feature 以上か（ui / parts から上げていないか）
-- [ ] `<ready>` がイベント配線だけに収まっているか
-- [ ] 通信前ゲートが fail-closed か（必要条件未充足で ajax していないか）
-- [ ] 共有一覧の成功結果を `dbc`（または局所 props）経由で載せているか
-- [ ] リクエスト世代で陳腐化応答を捨てているか（最新以外を一覧へ書いていないか）
-- [ ] 失敗時にサーバ文言を提示し、スケルトンを畳んでいるか
+- [ ] Are you reading a screen value from the DOM? (is `.val()` / `.text()` a source of state?)
+- [ ] Are you assigning strings to `innerHTML` or assembling HTML?
+- [ ] Is `{{ }}` wrapped in a dedicated element? (no other tag inside?)
+- [ ] Is display control written with class bindings? (are you switching anything but the 4 boolean attributes?)
+- [ ] Is the list's first render in `<ready>`?
+- [ ] Is there exactly one render method for the list, with nothing stacked onto the DOM directly from an event handler?
+- [ ] Is a child rewriting the parent via `self.parent()`?
+- [ ] Is a child rewriting a prop it received from the parent (including an object's contents)?
+- [ ] Are you referencing a sibling or a grandchild directly?
+- [ ] With `@` binding, do the attribute name and the prop name match? (they must, or the value never arrives)
+- [ ] Are child → parent notifications closure props? (are you using `postup` by default?)
+- [ ] Are closure props named `on_` + the fact that happened?
+- [ ] Are you defining a closure inside `<props>`? (is it a `null` declaration + assignment in `<init>`?)
+- [ ] Does the child check for `null` before calling a closure, and does it avoid calling in `<init>`?
+- [ ] Does every `postup` site carry a comment on why it is cross-cutting, and does it stop propagation with `true`?
+- [ ] Is `postup` emitted only from feature and above? (not raised from ui / parts?)
+- [ ] Does `<ready>` stay within event wiring?
+- [ ] Is the pre-communication gate fail-closed? (are you issuing ajax with required conditions unmet?)
+- [ ] Are successful shared-list results landed via `dbc` (or local props)?
+- [ ] Are stale responses discarded by request generation? (is anything but the latest written into the list?)
+- [ ] On failure, do you present the server's wording and fold the skeleton away?
