@@ -3,37 +3,39 @@ paths:
   - "**/crow3_*/**"
 ---
 
-# 📦 crow — コーディング規約（全レイヤ共通 / PHP 独自フレームワーク）
+# 📦 crow — coding rules (common to all layers / a bespoke PHP framework)
 
-> crow で新規システムを作る際の**最低限のコーディングルール**。
-> 進め方の基盤は develop の開発プロセス（反証駆動・縦切りスライス）に従うこと。
-> 目的：コードを一定のルールで書くことで、後の担当者のメンテナンスを楽にする。
+> The **minimum coding rules** for building a new system in crow.
+> The foundation for how to proceed is develop's development process (refutation-driven, vertical slices).
+> Purpose: writing code to a consistent set of rules makes maintenance easier for whoever comes next.
 >
-> 本書は **PHP / JS / CSS / HTML のすべてに効く共通スタイル**を扱い、
-> frontend / backend のどちらを書くときも従う。レイヤ固有の上乗せは
-> [frontend/coding.md](../frontend/coding.md) ／ backend 側の葉（[coding.md](../backend/coding.md)＝境界の核・[action.md](../backend/action.md)・[model.md](../backend/model.md)・[query.md](../backend/query.md)）にある。
-> **共通ルールをレイヤ側へ写さないこと**（SSOT はここ 1 箇所）。
+> This document covers **the common style that binds PHP, JS, CSS, and HTML alike**, and applies
+> whether you are writing frontend or backend. The layer-specific deltas live in
+> [frontend/coding.md](../frontend/coding.md) and the backend leaves ([coding.md](../backend/coding.md) = the core of the boundary, [action.md](../backend/action.md), [model.md](../backend/model.md), [query.md](../backend/query.md)).
+> **Never copy the common rules into a layer leaf** (the SSOT is here, in one place).
+>
+> **Write comments in Japanese.**
 
-> **注記:** 以下のコード例は構造（ブロックの揃え方など）を示すもの。実インデントは下表の通り **TAB** を使う（例中は表示の都合で見やすく整形している）。
+> **Note:** the code examples below show structure (how blocks line up). Real indentation uses **TAB** per the table below (the examples are formatted for readability).
 
-## インデント
+## Indentation
 
-| 対象 | インデント |
+| Target | Indentation |
 | --- | --- |
 | PHP | TAB |
-| HTML | 半角スペース 1 文字 |
-| HTML 内の PHP | TAB |
+| HTML | 1 half-width space |
+| PHP inside HTML | TAB |
 | CSS | TAB |
 | JS | TAB |
-| SQL ファイル | TAB |
+| SQL files | TAB |
 
-## 文字コードと改行コード
+## Encoding and line endings
 
-- **UTF-8** / 改行 **LF** / **BOM 無し** に統一する。
+- Standardize on **UTF-8**, **LF** line endings, and **no BOM**.
 
-## ブロック記述
+## Block layout
 
-`{` と `}` の縦のラインをそろえる（Allman スタイル）。
+Line up `{` and `}` vertically (Allman style).
 
 ```php
 function func()
@@ -46,10 +48,10 @@ function func()
 }
 ```
 
-## 命名規則
+## Naming
 
-- php / js / css のシンボルは、基本的にすべて **スネークケース**。
-- ただし、**メソッドの引数は末尾にアンダーバー `_` を付与**する。
+- Symbols in php / js / css are basically all **snake_case**.
+- However, **method parameters carry a trailing underscore `_`**.
 
 ```php
 function test_func( $arg1_, $arg2_ )
@@ -59,11 +61,11 @@ function test_func( $arg1_, $arg2_ )
 }
 ```
 
-## 命名規則（ローカル変数）
+## Naming (local variables)
 
-Web でリクエストパラメータとして受け取った内容を一時変数に格納することがある。
-それが**リクエストパラメータ由来か、内部で生まれたデータか**を判断できるよう、
-変数名の前に **`i_`（input の意）** を付ける。
+On the web, the content received as a request parameter is sometimes stored in a temporary variable.
+So that you can tell **whether it came from a request parameter or was born internally**,
+prefix the variable name with **`i_` (for input)**.
 
 ```php
 function action_test()
@@ -75,15 +77,15 @@ function action_test()
 }
 ```
 
-## コードをコピペする場合
+## When you copy-paste code
 
-ブラウザからコードをコピペすると、TAB であるべき箇所がスペースでペーストされる場合がある。
-**ペーストした場合は必ずコードの整形をチェックする。**
+Copying code from a browser can paste spaces where a TAB belongs.
+**After pasting, always check the formatting.**
 
-## 制御構文
+## Control structures
 
-- 演算子の前後はブランクをあける。
-- `else if` を使う。
+- Put a blank space on both sides of an operator.
+- Use `else if`.
 
 ```php
 if( $value=="abc" )
@@ -95,7 +97,7 @@ else if( $key == "0" && $value == "1" )
 }
 ```
 
-`switch` の `case` ブロックはインデントを下げる。`break` は中でも外でも可。
+Indent the `case` blocks of a `switch`. `break` may go inside or outside.
 
 ```php
 switch( $option )
@@ -112,9 +114,9 @@ switch( $option )
 }
 ```
 
-## 文字列中の変数
+## Variables inside strings
 
-文字列に変数を埋め込まない（連結する）。
+Do not interpolate variables into a string (concatenate instead).
 
 ```php
 $value = "123";
@@ -126,12 +128,12 @@ $data = "値は、$value です";
 $data = "値は、".$value." です";
 ```
 
-目視のチェック漏れを防ぐため。エディタのハイライターによっては、文字列中の変数が文字列と一体化して見えづらくなる。
+This prevents things being missed on visual inspection: with some editor highlighters, a variable inside a string blends into the string and becomes hard to see.
 
-## 複数行に跨る構文
+## Statements spanning several lines
 
-式が複数行にまたがる場合、最後のセミコロン `;` は最終行に書かず、**独立した 1 行**に記載する。
-その際、前の行のインデントに合わせる。
+When an expression spans several lines, do not put the final semicolon `;` on the last line — put it on **a line of its own**,
+aligned with the preceding line's indentation.
 
 ```php
 $sql = model_xxx::sql_select_all()
@@ -140,11 +142,11 @@ $sql = model_xxx::sql_select_all()
     ;
 ```
 
-追加修正を容易にし、漏れを防ぐため。
+This makes later additions easy and prevents omissions.
 
-## 複数行に跨る関数コール
+## Function calls spanning several lines
 
-引数が長くなり改行する場合、`(` と `)` の縦のラインを揃える。
+When arguments grow long enough to wrap, line up `(` and `)` vertically.
 
 ```php
 {
@@ -157,9 +159,9 @@ $sql = model_xxx::sql_select_all()
 }
 ```
 
-## 複数行に跨る複雑な構文
+## Complex statements spanning several lines
 
-引数区切りは続けてカンマ `,` を記載し、`{}` や `()` などのブロックは改行する。
+Keep argument separators as trailing commas `,`, and break lines for blocks such as `{}` and `()`.
 
 ```php
 {
@@ -181,13 +183,13 @@ $sql = model_xxx::sql_select_all()
 }
 ```
 
-## コメント
+## Comments
 
-php / js のコード中コメントは **`//<TAB>コメント`** とする。3 行以上になる場合は **`/* ～ */`**。
+In-code comments in php / js take the form **`//<TAB>comment`**. Use **`/* … */`** when they run to 3 lines or more.
 
-### コメントの前に改行を入れる
+### Put a blank line before a comment
 
-コメントの前には空行をあける。
+Leave a blank line before a comment.
 
 ```php
 //  処理です
@@ -197,7 +199,7 @@ self::exec_func();
 self::exec_func2();
 ```
 
-ただし、ブロック開始行の次の行には改行不要。
+No blank line is needed on the line right after a block opens, though.
 
 ```php
 if( xxxxxx )
@@ -207,16 +209,16 @@ if( xxxxxx )
 }
 ```
 
-## 文書の横幅と折り返しの目安
+## Line width and where to wrap
 
-- 各プログラムファイルの横幅は **半角 80 文字**を基準に折り返しを考える。
-- 80 文字を超える場合は、式の区切りやブラケットで適宜折り返す。
-- ただし、コメントの `// ------略-----` は、頭のインデントを含めて横幅 80 文字にあわせる。
+- Consider wrapping each program file at a baseline width of **80 half-width characters**.
+- Past 80 characters, wrap at a natural break in the expression or at a bracket.
+- A `// ------略-----` comment, however, is sized to 80 characters **including its leading indentation**.
 
-## 型付の比較演算子
+## Typed comparison operators
 
-- 真偽値と null に対する比較演算は**必ず型付（`===` / `!==`）**で行う。
-- **NOT 演算子 `!` は使用禁止**。
+- Comparisons against booleans and null are **always typed (`===` / `!==`)**.
+- **The NOT operator `!` is forbidden.**
 
 ```php
 $target = true;
@@ -242,10 +244,10 @@ if( $target === false )
 }
 ```
 
-## PHP 閉じタグ
+## The PHP closing tag
 
-ファイル終端の閉じタグ `?>` は、現時点では**つけておく**。
-多少オーバーヘッドはあるが気にする程度ではなく、開始に対する終了を明確にした方がよいという考え。
+For now, **keep** the closing tag `?>` at the end of a file.
+There is some overhead, but not enough to worry about, and making the end explicit against the start is considered better.
 
 ```php
 <?php
@@ -253,6 +255,6 @@ if( $target === false )
 ?>
 ```
 
-## ファイル終端の改行
+## The trailing newline
 
-PHP に限らず、**ファイルの終端は必ず改行で終わる**ようにする。
+Not only in PHP: **every file ends with a newline**.

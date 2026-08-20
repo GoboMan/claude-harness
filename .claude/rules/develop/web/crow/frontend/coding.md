@@ -6,22 +6,24 @@ paths:
   - "**/crow3_*/app/assets/js/**"
 ---
 
-# 🎨 crow / frontend — コーディング規約（表面の上乗せ）
+# 🎨 crow / frontend — coding rules (the surface-layer delta)
 
-> **共通スタイルは [common/coding.md](../common/coding.md)**（インデント表・Allman・snake_case・
-> `i_` プレフィックス・`===`／`!` 禁止・コメント `//<TAB>`・80 桁・PHP 閉じタグ・ファイル終端改行）。
-> 本書は**それに従ったうえで**、表面（HTML / CSS / JS）にだけ効く差分を定める。
-> 共通側の再掲はしない。
+> **The common style is [common/coding.md](../common/coding.md)** (the indentation table, Allman, snake_case,
+> the `i_` prefix, the ban on `===` / `!`, `//<TAB>` comments, 80 columns, the PHP closing tag, the trailing newline).
+> This document defines, **on top of following that**, only the delta that binds the surface (HTML / CSS / JS).
+> It never restates the common side.
 >
-> 対象は crow の view（HTML＋埋め込み PHP）・CSS・JS を書く／直すとき。
-> **ビューパーツ固有**（セクション DSL・バインド・親子・dbc／ajax）は
+> It applies when writing or fixing crow views (HTML + embedded PHP), CSS, and JS.
+> **Viewpart-specific matters** (the section DSL, binding, parent/child, dbc/ajax) are authoritative in
 > [viewpart.md](./viewpart.md) / [viewpart-dataflow.md](./viewpart-dataflow.md) /
-> [viewpart-components.md](./viewpart-components.md) が正。本書へ写さない。
+> [viewpart-components.md](./viewpart-components.md). Do not copy them here.
+>
+> **Write comments in Japanese.**
 
-## HTML 中のコメント
+## Comments inside HTML
 
-HTML の中のコメントは **`<!-- ～ -->` を使わず**、PHP のコメントを使う。
-HTML コメントはそのままクライアントへ送出されてしまうため。
+Inside HTML, **do not use `<!-- … -->`** — use a PHP comment,
+because an HTML comment is emitted to the client as-is.
 
 ```php
 <!-- こうではなくて -->
@@ -31,20 +33,20 @@ HTML コメントはそのままクライアントへ送出されてしまうた
 <div></div>
 ```
 
-## 折り返しの例外（HTML）
+## The wrapping exception (HTML)
 
-[common/coding.md](../common/coding.md) の「横幅 半角 80 文字を基準に折り返す」に従うが、
-**HTML はタグの途中で折り返さない**。80 文字を超えてもタグは 1 つのまとまりとして保つ。
+Follow [common/coding.md](../common/coding.md)'s "wrap at a baseline of 80 half-width characters", but
+**never wrap in the middle of an HTML tag**. A tag stays one unit even past 80 characters.
 
 ## CSS
 
-トークン・重複禁止・`<style>` のスコープは
-[viewpart-components.md](./viewpart-components.md) §7 が正。
-本書では再掲しない。生の色コードをパーツ `<style>` に直書きしない、も同節。
+Tokens, the ban on duplication, and the scope of `<style>` are authoritative in
+[viewpart-components.md](./viewpart-components.md) §7.
+This document does not restate them. "Never hardcode a raw color into a part's `<style>`" is in that same section.
 
-## JavaScript の変数宣言
+## Variable declarations in JavaScript
 
-**`var` は使わない。** `let` / `const` を使う。再代入しない値は `const`。
+**Never use `var`.** Use `let` / `const`. A value that is not reassigned is `const`.
 
 ```javascript
 //  NG
@@ -55,15 +57,15 @@ let count = 0;
 const max_page = 10;
 ```
 
-## JavaScript の文字列
+## Strings in JavaScript
 
-文字列リテラルは **ダブルクォート `"..."` を基本**とする
-（既存コード・PHP 側の慣習と揃える）。テンプレートリテラル `` `...` `` は
-改行や式埋め込みが必要なときに限る。
+String literals are **double-quoted `"..."` by default**
+(matching existing code and the PHP-side convention). Template literals `` `...` `` are used only
+where a newline or an embedded expression is needed.
 
-## JavaScript における配列・オブジェクトの末尾カンマ
+## Trailing commas in JavaScript arrays and objects
 
-JavaScript では、配列やオブジェクトの**末尾要素の行末をカンマで終わる**ようにする（2024/12/23）。
+In JavaScript, **end the last element's line with a comma** in arrays and objects (2024/12/23).
 
 ```javascript
 let obj =
@@ -73,13 +75,13 @@ let obj =
 };
 ```
 
-## JavaScript の比較はすべて型付
+## Every comparison in JavaScript is typed
 
-common/coding.md の型付比較は「真偽値と null」を対象に定めているが、
-**JavaScript では対象を限定せず、常に `===` / `!==` を使う**。
+common/coding.md defines typed comparison for booleans and null, but
+**in JavaScript the scope is unrestricted: always use `===` / `!==`.**
 
-PHP と違い JS の `==` は文字列と数値、`null` と `undefined` を暗黙変換して等しいと判定するため、
-`"0" == 0` や `null == undefined` が成立してしまう。比較対象を選ばず型付に統一する。
+Unlike PHP, JS's `==` coerces between strings and numbers and between `null` and `undefined`, so
+`"0" == 0` and `null == undefined` both hold. Use typed comparison regardless of what is being compared.
 
 ```javascript
 //  NG
@@ -89,4 +91,4 @@ if( id == "1" )
 if( id === "1" )
 ```
 
-`!` の禁止は common/coding.md のとおり JS でも守る（`=== false` / `!== true` で書く）。
+The ban on `!` from common/coding.md holds in JS too (write `=== false` / `!== true`).

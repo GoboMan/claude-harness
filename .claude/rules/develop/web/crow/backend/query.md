@@ -3,66 +3,69 @@ paths:
   - "**/crow3_*/app/assets/query/**"
 ---
 
-# 🗃️ crow / backend — raw SQL とフラグメント
+# 🗃️ crow / backend — raw SQL and fragments
 
-> **読むタイミング: `app/assets/query/**` の `.sql` を書く・直すとき。**
-> model 側に raw フラグメントを使う定型クエリを書くときも、**`.sql` を必ず伴う**ので本葉を開く。
-> `sql_select_all()` チェーンだけで足りる単純取得なら開かなくてよい（[model.md](./model.md) §3.10）。
+> **When to read this: when writing or fixing a `.sql` under `app/assets/query/**`.**
+> Also open this leaf when writing a routine query on the model side that uses a raw fragment —
+> it **always comes with a `.sql`**. You need not open it for a simple fetch that the
+> `sql_select_all()` chain alone covers ([model.md](./model.md) §3.10).
 >
-> **境界の正本は [coding.md](./coding.md) §1.1**（本葉と矛盾したら向こうが勝つ）。
-> 置き場の判定は [model.md](./model.md) §3.4、実行を書くのは [action.md](./action.md)。
-> SQL ファイルのインデント（TAB）は [common/coding.md](../common/coding.md)。
+> **The boundary is authoritative in [coding.md](./coding.md) §1.1** (it wins over this leaf on conflict).
+> Deciding where something goes is [model.md](./model.md) §3.4; writing the execution is [action.md](./action.md).
+> Indentation in SQL files (TAB) is [common/coding.md](../common/coding.md).
 >
-> 節番号は backend 規約全体の通し番号（本葉は `model.md` §3 の中の §3.9 を切り出したもの）。
+> Section numbers run through the backend rules as a whole (this leaf is §3.9, carved out of `model.md` §3).
+>
+> **Write comments in Japanese.**
 
 ---
 
-## 3.9 raw SQL とフラグメント
+## 3.9 raw SQL and fragments
 
-定型取得で `sql_select_all()` ビルダだけでは足りないとき（JOIN・複合 filters・ページャ付き一覧）は、
-**SQL フラグメント + 主語 model の組み立て**を使う。
+When the `sql_select_all()` builder alone does not suffice for a routine fetch (JOINs, composite
+filters, a paginated list), use **a SQL fragment + assembly by the subject model**.
 
-#### 分担
+#### Division of labor
 
-| 層 | 責務 |
+| Layer | Responsibility |
 | --- | --- |
-| **`app/assets/query/`** | `@fragment_name` 形式の SQL 断片（SSOT）。**`ORDER BY` もここに含める** |
-| **主語 `model_*`** | フラグメント名・args・WHERE の意味・行順・`get_allowed_*_filter_keys()` |
-| **[model.md](./model.md) §4 util** | 表横断のフィルタ衛生（skip / coerce / キーワード正規化） |
-| **`action_*`** | いつ実行するか、`$hdb->raw*` / `raw_select*` の呼び出し、pager への受け渡し |
+| **`app/assets/query/`** | SQL fragments in `@fragment_name` form (the SSOT). **`ORDER BY` belongs here too** |
+| **the subject `model_*`** | the fragment name, the args, the meaning of the WHERE, the row order, `get_allowed_*_filter_keys()` |
+| **[model.md](./model.md) §4 util** | cross-table filter hygiene (skip / coerce / keyword normalization) |
+| **`action_*`** | when to execute, the `$hdb->raw*` / `raw_select*` calls, handing off to the pager |
 
-model は **意味と args** を組み立て、**`$hdb` の取得は action**（[coding.md](./coding.md) §1.1 のシステム責務）が行う。
-**Domain 側で `crow::get_hdb()` を呼ばない。** 実行に `$hdb` が要るなら**引数で受け取る**
-（`build_list_queries($hdb_, ...)` のように、呼び手が渡す）。
+The model assembles **meaning and args**; **obtaining `$hdb` is the action's job** (a system responsibility, [coding.md](./coding.md) §1.1).
+**Never call `crow::get_hdb()` on the Domain side.** If execution needs `$hdb`, **receive it as an argument**
+(as in `build_list_queries($hdb_, ...)`, passed by the caller).
 
-#### SQL ファイルの置き場
+#### Where SQL files go
 
-- **`app/assets/query/_common_/`** … 複数 module で共有する断片
-- **`app/assets/query/<module>/`** … module 固有の断片
-- フラグメント名 **`@where_progress_status`** 等は、PHP 側の `$hdb->raw('where_progress_status', ...)` と **完全一致**させる。
+- **`app/assets/query/_common_/`** … fragments shared by several modules
+- **`app/assets/query/<module>/`** … module-specific fragments
+- A fragment name such as **`@where_progress_status`** must match the PHP-side `$hdb->raw('where_progress_status', ...)` **exactly**.
 
-#### allow-list
+#### The allow-list
 
-- filters の **許可キー**は主語 model の **`get_allowed_*_filter_keys()`**（または同等の static）が持つ。
-- action が filters をそのまま SQL に渡さない。
-- 表横断 util に allow-list を集約しない（[model.md](./model.md) §4 は衛生だけ）。
+- The **permitted keys** for filters are held by the subject model's **`get_allowed_*_filter_keys()`** (or an equivalent static).
+- An action never passes filters straight into SQL.
+- Do not centralize the allow-list into the cross-table util ([model.md](./model.md) §4 is hygiene only).
 
-#### `raw` と `raw_noencode`
+#### `raw` vs `raw_noencode`
 
-| API | 使う場面 |
+| API | When to use it |
 | --- | --- |
-| `$hdb->raw($name, ...$args)` | フラグメント内の **`"%s"` 付き**プレースホルダへ値を渡す（addslashes される） |
-| `$hdb->raw_noencode($name, ...$parts)` | **WHERE 句の結合**、すでに組み立て済みの条件文字列、非引用文脈への埋め込み |
+| `$hdb->raw($name, ...$args)` | passing values into placeholders **with `"%s"` quoted** inside a fragment (they get addslashes'd) |
+| `$hdb->raw_noencode($name, ...$parts)` | **joining WHERE clauses**, an already-assembled condition string, embedding into an unquoted context |
 
-- 非引用文脈（`= %s` / `in (%s)` で引用符が無い `%s`）へ渡す値は **model が `(int)` 等で型を潰す**。
-  表横断の skip / coerce は **[model.md](./model.md) §4 util** に委譲（各 model へ複製しない）。
-- `raw()` の addslashes だけを非引用 `%s` の防御に使わない。
+- For values passed into an unquoted context (a `%s` without quotes, as in `= %s` / `in (%s)`), **the model flattens the type with `(int)` or similar**.
+  Cross-table skip / coerce is delegated to the **[model.md](./model.md) §4 util** (never duplicated into each model).
+- Never rely on `raw()`'s addslashes alone as the defense for an unquoted `%s`.
 
-#### ページャ付き一覧（rows + count）
+#### A paginated list (rows + count)
 
-JOIN 付き一覧では **pager の count 自動生成を使わない**（ユーザー入力を WHERE に載せると走査が壊れうる）。
+For a list with JOINs, **do not use the pager's automatic count generation** (putting user input into the WHERE can break the scan).
 
-主語 model が **同一 FROM / JOIN / WHERE** の 2 本を返す:
+The subject model returns two queries over the **same FROM / JOIN / WHERE**:
 
 ```php
 return
@@ -72,9 +75,9 @@ return
 ];
 ```
 
-action はこの配列を `crow_db_pager::create_with_query(...)` や `set_count_query()` に渡す。
+The action passes this array to `crow_db_pager::create_with_query(...)` or `set_count_query()`.
 
-#### 組み立ての流れ（例）
+#### The assembly flow (example)
 
 ```php
 //  model — 意味と args
@@ -95,10 +98,9 @@ $where_str = (count($where) > 0) ? implode(' and ', $where) : true;
 $queries = model_user::build_list_queries($hdb, $where_str);
 ```
 
-#### やらないこと
+#### What not to do
 
-- 横断クラスに `@fragment` 名と args 組み立てを溜め込む。
-- PHP 内に長い SQL 文字列をベタ書きする（`.sql` に置く）。
-- JOIN 一覧で count 自動生成だけに頼る。
-- 取得後に PHP で行順を付け直す（`ORDER BY` をフラグメント／定型クエリ側で決める）。
-
+- Hoard `@fragment` names and args assembly in a cross-cutting class.
+- Hardcode long SQL strings inside PHP (put them in a `.sql`).
+- Rely on automatic count generation alone for a list with JOINs.
+- Re-sort rows in PHP after fetching them (`ORDER BY` is decided in the fragment or the routine query).

@@ -4,111 +4,114 @@ paths:
   - "**/crow3_*/phpunit.xml*"
 ---
 
-# 🧪 crow — テストの共通則（全レイヤ）
+# 🧪 crow — common testing rules (all layers)
 
-> **テストの原則（何を・なぜテストするか）は develop の開発プロセスが土台。**
-> GWT からテストを起こす／テスト設計と実装を別コンテキストで脱相関させる／Red→Green→Refactor／
-> 最後は敵対検証（必要なら `/attack`）——これらは全開発共通なのでここには再掲せず、そこに従う。
+> **The principles of testing (what to test and why) rest on develop's development process.**
+> Deriving tests from GWT, decorrelating test design and implementation into separate contexts,
+> Red→Green→Refactor, and closing with adversarial verification (`/attack` if needed) — these are
+> common to all development, so they are not restated here; follow them there.
 >
-> 本書は **crow でテストを書くときに守ること**を定める。
-> レイヤ固有の書き方は [backend/testing.md](../backend/testing.md)。
-> **frontend のテスト書き方葉は当面置かない**（develop は FE テストを起票しない）。
-> **共通則をレイヤ側へ写さないこと**（SSOT はここ 1 箇所）。
+> This document defines **what to observe when writing tests in crow**.
+> Layer-specific style lives in [backend/testing.md](../backend/testing.md).
+> **No frontend testing leaf is placed for now** (develop does not file FE tests).
+> **Never copy the common rules into a layer leaf** (the SSOT is here, in one place).
+>
+> **Write test names and comments in Japanese.**
 
 ---
 
-## テスト対象はドメイン（手書き）だけ
+## What gets tested is the domain (hand-written) only
 
-crow には **(A) `engine/kernel/` のフレームワーク本体**と **(B) `db_design.txt` から差し込まれる生成メンバ**がある。
-どちらもフレームワークの責務として**信頼し、アプリの Red／特性化の SUT にしない。**
+crow has **(A) the framework proper under `engine/kernel/`** and **(B) generated members injected from `db_design.txt`**.
+Both are the framework's responsibility: **trust them, and never make them the SUT of an app-level Red or characterization test.**
 
-| 起こす | 起こさない |
+| Do file | Do not file |
 | --- | --- |
-| `app/` 配下に**手で書いた**ドメインメソッド・拡張フック・`action_*` の振る舞い | **`engine/kernel/**` の挙動そのもの**（入力キー形の網羅・バリデーション・viewpart 解決・CSRF など） |
-| GWT／契約が要求する、アプリ固有の判定・導出・失敗系 | crow が差し込む生成メンバ（定数マップ／`_*_str()`／`sql_select_all()` 等） |
-|  | enum／定数の値が増えるたびに組合せが膨らむ「生成 API・kernel API の網羅／特性化」 |
+| Domain methods, extension hooks, and `action_*` behavior **hand-written** under `app/` | **The behavior of `engine/kernel/**` itself** (sweeping input key shapes, validation, viewpart resolution, CSRF, and so on) |
+| App-specific decisions, derivations, and failure paths that the GWT or the contract demands | Generated members crow injects (constant maps, `_*_str()`, `sql_select_all()`, and so on) |
+|  | "Sweeps and characterizations of generated APIs and kernel APIs" whose combinations swell every time an enum or constant gains a value |
 
-理由: kernel や生成面を写経すると、フレームワーク更新・enum 追加のたびにケースが増え、保守コストだけが増える。反証すべきなのは**自分が書いた意味**である。
+Why: transcribing the kernel or the generated surface adds cases every time the framework updates or an enum grows, buying nothing but maintenance cost. What must be refuted is **the meaning you wrote**.
 
-- **GWT が enum 値や日時入力に触れていても**、検証するのは「その入力を受けた**手書きロジック／ゲート**がどう振る舞うか」であって、`get_<field>_map()` や `crow_db_table_model::input_from_request()` の正しさではない
-- アプリが kernel の都合に合わせて書くときも、**SUT は app 側**に置く。kernel の実測を固定する「engine 特性化テスト」は develop の Red 対象外（framework 本体のテストは crow 本体／別リポジトリの責務）
-- 既存スイートに kernel／生成面のテストがあっても、**手本にして増やさない**
-- 生成メンバの列挙は [backend/model.md](../backend/model.md) §3.6 の「生成済みメンバを再定義しない」に従う。レイヤ固有の切り方は [backend/testing.md](../backend/testing.md)
+- **Even when the GWT touches an enum value or a datetime input**, what you verify is how the **hand-written logic or gate** that received that input behaves — not the correctness of `get_<field>_map()` or `crow_db_table_model::input_from_request()`
+- Even when the app is written around the kernel's constraints, **keep the SUT on the app side**. An "engine characterization test" that pins the kernel's measured behavior is outside develop's Red scope (testing the framework proper is crow's own repository's responsibility)
+- Even if the existing suite contains kernel or generated-surface tests, **do not take them as a model and multiply them**
+- Enumerating generated members follows "do not redefine generated members" in [backend/model.md](../backend/model.md) §3.6. Layer-specific carving is in [backend/testing.md](../backend/testing.md)
 
-## 1 テスト = 1 振る舞い
+## One test = one behavior
 
-- 1 つのテストは**1 つの振る舞い**だけを検証する。無関係な複数アサートを詰め込まない
-- テスト本文に **条件分岐・ループを書かない**。ロジックが入ると「テストのバグ」を生む。
-  分岐したくなったら、それは別テストか、ランナーのデータ駆動機能に分ける
+- One test verifies **one behavior**. Do not stuff unrelated assertions into it
+- **Never write a conditional or a loop in a test body.** Logic there breeds "bugs in the test".
+  When you want to branch, that is either a separate test or a job for the runner's data-driven feature
 
-## ハッピーパスで終えない
+## Do not stop at the happy path
 
-開発プロセスの「失敗・空・権限・境界を条件に含める」を、テストケースとして実装する。
-正常系だけのテストは、通っても何も保証しない。
-**ただし「網羅」の対象は手書きドメインに限る**（上節）。kernel／生成面の入力形・値一覧をケースに展開して網羅したことにしない。
+Implement the development process's "include failure, empty, permission, and boundary in the conditions" as test cases.
+A test that covers only the success path guarantees nothing by passing.
+**But "coverage" applies only to hand-written domain logic** (see the section above). Do not claim coverage by expanding the kernel's or the generated surface's input shapes and value lists into cases.
 
-## モックは境界だけ
+## Mock only at the boundary
 
-- モックするのは **DB・外部 I/O・ネットワーク・時刻・乱数など「境界」だけ**
-- **内部ロジックはモックしない。** モックだらけのテストは「実装の写経」になり反証力を失う
+- Mock only **the "boundaries": the DB, external I/O, the network, time, randomness**
+- **Never mock internal logic.** A test full of mocks becomes a transcription of the implementation and loses its refutation power
 
-## 決定的にする（フレークを作らない）
+## Make it deterministic (never create a flake)
 
-- 実時刻・乱数・ネットワーク・ファイルシステムに**暗黙依存しない**。必要なら注入してテストで固定する
-- テスト同士は**順序に依存しない**。共有状態を持ち込まず、書き換えたら必ず元に戻す
+- **Never depend implicitly** on real time, randomness, the network, or the filesystem. Inject them where needed and pin them in the test
+- Tests **never depend on order**. Do not carry shared state in, and always restore anything you changed
 
-## 実行はコマンド一発
+## One command to run
 
-- **コマンド 1 つで全件実行でき、終了コードで赤緑が判定できる**こと。CI でも同じコマンドで回す
-- これを満たさない仕組みは、develop の Phase4（機械オラクルで回す赤緑ループ）に使えない
+- **A single command must run everything, with the exit code deciding red or green.** CI runs the same command
+- A setup that fails this cannot serve develop's Phase4 (the red-green loop driven by the machine oracle)
 
-## スイートは「実行に何を要求するか」で分ける
+## Split suites by what execution requires
 
-テストレベルの呼び名（単体／結合／システム）を先に決めて分類するのではなく、
-**そのテストを走らせるのに何を起動する必要があるか**で分ける。この基準は判断を要さず機械的に決まり、
-かつ「赤緑ループに混ぜてよいか」と一致する。
+Rather than picking test-level names (unit / integration / system) first and classifying by them,
+split by **what has to be started for that test to run**. This criterion needs no judgment, is decided
+mechanically, and coincides with "may this be mixed into the red-green loop?"
 
-| スイート | 判定基準（これだけで決まる） | 回す頻度 |
+| Suite | The criterion (this alone decides it) | How often it runs |
 | --- | --- | --- |
-| **既定**（単体） | 外部環境を一切起動しない（モックは境界だけ） | develop Phase4 の赤緑ループで毎回 |
-| **結合** | **実 DB・実サービスに接続する** | 境界（返す直前・commit 前・CI）のみ |
-| **システム** | **ブラウザ・実機を起動する** | 工程外（opt-in） |
+| **Default** (unit) | starts no external environment (mocks only at the boundary) | every time, in develop's Phase4 red-green loop |
+| **Integration** | **connects to a real DB or a real service** | at a boundary only (before returning, before commit, in CI) |
+| **System** | **starts a browser or a real device** | outside the phases (opt-in) |
 
-住所と実行コマンドは [backend/testing.md](../backend/testing.md) が定める。
+Locations and run commands are defined by [backend/testing.md](../backend/testing.md).
 
-- **分離はフォルダで行う。** タグやアノテーションでの分離は、実行コマンド側の設定漏れで既定スイートに混入したとき気づけない。
-  フォルダが分かれていれば「**既定スイートのコマンドがそのパスを拾わない**」ことで機械的に保証できる
-- **既定スイートは、DB もブラウザも用意されていないマシンで緑になる**こと。ここが崩れると Phase4 が成立しない
-- 「実行はコマンド一発」は**スイートごとに 1 コマンド**という意味である。結合・システムを既定スイートのコマンドに混ぜない
+- **Separate by folder.** Separation by tag or annotation cannot be noticed when a gap in the run command's configuration lets something leak into the default suite.
+  With folders separated, it is mechanically guaranteed by **the default suite's command not picking up that path**
+- **The default suite must go green on a machine with neither a DB nor a browser available.** If that breaks, Phase4 does not hold
+- "One command to run" means **one command per suite**. Never mix integration or system into the default suite's command
 
-### 契約適合テストは既定スイートに置く
+### Contract-conformance tests belong to the default suite
 
-backend の契約適合テスト（入出力・純粋関数。[backend/testing.md](../backend/testing.md)）は、外部環境を起動しないので**結合スイートではない**。上表の判定基準では既定に落ちる。
+The backend's contract-conformance tests (inputs/outputs, pure functions — [backend/testing.md](../backend/testing.md)) start no external environment, so they are **not integration tests**. By the criterion above they fall into the default suite.
 
-**ここを結合スイートへ移してはならない。** develop の Phase4 機械オラクルは当面 **BE テスト**が担う（FE テストは起票しない）。
-赤緑ループから外れた瞬間、結合欠陥を Phase4 で捕まえる手段が無くなる。
+**They must never be moved into the integration suite.** develop's Phase4 machine oracle is carried, for now, by the **BE tests** (FE tests are not filed).
+The moment they leave the red-green loop, there is no means left of catching an integration defect in Phase4.
 
-### システムスイートは「置き場所があるだけ」
+### The system suite is "a place that merely exists"
 
-**ブラウザ駆動のシステムテストは develop の工程に無い。** 必要と判断したプロジェクトが独自に足すもので、
-本書はその書き方（ツール選定・シナリオの組み方）を扱わない。定めるのは**住所と「既定スイートに混ぜない」ことだけ**である。
-フォルダが空であることは欠落ではない。
+**Browser-driven system tests are not part of develop's phases.** A project that judges them necessary adds them itself, and
+this document does not cover how to write them (tool choice, scenario construction). It defines only **the location and "do not mix them into the default suite"**.
+An empty folder there is not a gap.
 
-## スコープ実行（機能ID タグ）
+## Scoped execution (the feature ID tag)
 
-全件実行に加えて、**機能単位の指定実行**をコマンド 1 つで可能にする。
+Beyond running everything, make **per-feature selective execution** possible with a single command.
 
-- **すべてのテストに機能ID（`F-xxx`。`docs/specs/` のディレクトリ名と同じキー）を機械選択可能な形で刻む**（グループ属性またはテスト名プレフィックス。具体構文はレイヤ側の葉）
-- これにより「この修正に関係するテスト」が判断ではなく **`F-xxx` からの機械的解決**になる。修正ループ中は該当機能の指定実行で回し、フル実行は境界（返す直前・commit 前・CI）に寄せる
-- タグの無いテストはスコープ実行から漏れて回帰検出が境界任せになる。**新規テストにタグ漏れを作らない**
+- **Stamp every test with its feature ID (`F-xxx` — the same key as the directory name under `docs/specs/`) in a machine-selectable form** (a group attribute or a test-name prefix; the concrete syntax is in the layer leaf)
+- This turns "the tests relevant to this fix" from a judgment into a **mechanical resolution from `F-xxx`**. During the fix loop, run the selection for that feature; push full runs to the boundaries (before returning, before commit, in CI)
+- An untagged test falls out of scoped execution, leaving regression detection to the boundary. **Never let a new test go untagged**
 
-## 命名
+## Naming
 
-- シンボルは [common/coding.md](./coding.md) のとおり snake_case。
-  ただし**テストフレームワークが強制する識別子はその規約が優先**する（PHPUnit の `setUp()` など）
-- テスト名は「**何をしたら何が起きるか**」が名前だけで分かるようにする
+- Symbols are snake_case per [common/coding.md](./coding.md).
+  However, **identifiers the test framework mandates take precedence** (PHPUnit's `setUp()`, and so on)
+- A test name must make "**what happens when you do what**" clear from the name alone
 
-## カバレッジは目標ではなく信号
+## Coverage is a signal, not a target
 
-カバレッジ率は「どこを見ていないか」の目安であって**達成目標にしない**。
-開発プロセスの通り、**テスト緑は前提条件であって完成条件ではない**。緑の後に敵対検証（`slice-reviewer`。必要なら `/attack`）で欠陥を摘発する。
+The coverage percentage is a hint about what you are not looking at — **never a target to hit**.
+Per the development process, **green tests are a precondition, not the definition of done**. After green, adversarial verification (`slice-reviewer`, and `/attack` if needed) exposes the defects.

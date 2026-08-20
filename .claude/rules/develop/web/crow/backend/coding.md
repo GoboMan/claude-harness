@@ -5,158 +5,160 @@ paths:
   - "**/crow3_*/**/module_*.php"
 ---
 
-# ⚙️ crow / backend — 責務の境界（サーバ側の核）
+# ⚙️ crow / backend — the boundary of responsibilities (the server-side core)
 
-> **読むタイミング: crow のサーバ側 PHP（action / model / service / presenter / util / SQL）を書く・直すとき、必ず最初に。**
-> 本葉は**どの住所を触るときも効く不変則**だけを持つ。住所ごとの書き方は §1.2 の索引から必要な葉だけを開く。
+> **When to read this: always first, when writing or fixing crow's server-side PHP (action / model / service / presenter / util / SQL).**
+> This leaf holds only **the invariants that bind whichever address you touch**. For how to write at a given address, open only the leaves you need from the index in §1.2.
 >
-> **共通スタイルは [common/coding.md](../common/coding.md)**（インデント表・Allman・snake_case・
-> `i_` プレフィックス・`===`／`!` 禁止・コメント `//<TAB>`・80 桁・PHP 閉じタグ・ファイル終端改行）。
-> 本書は**それに従ったうえで**、サーバ側にだけ効く差分を定める。
-> 共通側の再掲はしない。記法は common に従い、無いルールを埋めるために写してこないこと。
+> **The common style is [common/coding.md](../common/coding.md)** (the indentation table, Allman, snake_case,
+> the `i_` prefix, the ban on `===` / `!`, `//<TAB>` comments, 80 columns, the PHP closing tag, the trailing newline).
+> This document defines, **on top of following that**, only the delta that binds the server side.
+> It never restates the common side. Follow common for notation, and do not copy things over here to fill a rule that is absent.
 >
-> 以下で定めるのは記法ではなく **「サーバ側のロジックをどこに書くか」** である。
-> 白紙から実装しても、この区分に自然と収まるように書く。
+> What follows defines not notation but **"where server-side logic goes"**.
+> Even implementing from scratch, write so that it falls naturally into these divisions.
+>
+> **Write comments in Japanese.**
 
 ---
 
-## 1. 全体概要
+## 1. Overview
 
-厳密な 4 層を crow 上で再現しない。やることは **action / model / presenter / 非モデル util の置き場を徹底する** こと。
+Do not reproduce a strict 4-layer architecture on top of crow. What you do is **be rigorous about where action / model / presenter / non-model utils go**.
 
-| よく言う層 | crow での実体 | 一言 |
+| The usual layer name | What it actually is in crow | In a phrase |
 | --- | --- | --- |
-| Presentation（画面） | view / viewpart / フロント JS | 画面固有の見せ方 |
-| Presentation（共有表示値） | `model_*_presenter` / `common_presenter` | 契約に載せる表示導出 |
-| Application（ユースケース） | `module_*` の `action_*` | 入力を開き、頼み、出力を閉じる |
-| Domain（1 表が主語） | `model_<table>` の**手書き**メソッド・フック | その表の意味・判定・定型取得 |
-| Domain（複数表にまたがる） | `model_<table>_<table>_service` | 単一の表を主語にできない業務判定・導出（[model.md](./model.md) §3.12） |
-| Infrastructure | crow ORM／生成メンバ／`raw` SQL／外部 API | model 継承側に**同居してよい** |
-| （表に属さない共有・非表示） | `app/classes/_common_/` の非モデル util | フィルタ衛生など |
+| Presentation (screens) | view / viewpart / frontend JS | screen-specific presentation |
+| Presentation (shared display values) | `model_*_presenter` / `common_presenter` | display derivations that go on the contract |
+| Application (use cases) | `action_*` in `module_*` | open the input, ask, close the output |
+| Domain (one table as the subject) | **hand-written** methods and hooks on `model_<table>` | that table's meaning, decisions, and routine fetches |
+| Domain (spanning several tables) | `model_<table>_<table>_service` | business decisions and derivations no single table can be the subject of ([model.md](./model.md) §3.12) |
+| Infrastructure | the crow ORM / generated members / `raw` SQL / external APIs | **may live alongside** the model's inheriting side |
+| (shared, non-display, belonging to no table) | non-model utils under `app/classes/_common_/` | filter hygiene and the like |
 
-**核心（必須）**
+**The core (mandatory)**
 
-1. **その表の意味・判定・定型クエリ（一覧の主語になる取得を含む）→ `model_*`**
-   **複数表にまたがり主語を決められない業務判定・導出 → `model_<table>_<table>_service`（[model.md](./model.md) §3.12）**
-2. **リクエストの受け・結果を見てどう返すか・複数モデルの更新順／Tx → `action_*`**
-   （**action = 入力を開き、model / presenter に頼み、出力を閉じる。** 詳細は [action.md](./action.md) §2.1）
-3. **どの表の Domain とも言えない共有の純粋処理（非表示）→ 非モデル util（[model.md](./model.md) §4）**
-4. **契約レスポンスの束ね → action。共有の表示値導出 → presenter（[model.md](./model.md) §3.11）。画面固有の見せ方・画面上の並び → frontend（feature / scene）**
-   （model に表示用・画面専用を入れない。FE 側の正本は [frontend/viewpart-components.md](../frontend/viewpart-components.md) §9）
-5. **一覧・候補の行順（契約上の取得順）→ SQL の `ORDER BY`（定型クエリ／フラグメント）。取得後の PHP 並び替えはしない。**
-   FE が並べ替えてよいのは、契約上の行順を変えない見せ方だけ（[model.md](./model.md) §3.4）
+1. **A table's meaning, decisions, and routine queries (including a fetch that is the subject of a list) → `model_*`**
+   **A business decision or derivation spanning several tables with no determinable subject → `model_<table>_<table>_service` ([model.md](./model.md) §3.12)**
+2. **Receiving the request, deciding how to respond given the result, the update order across models, and Tx → `action_*`**
+   (**an action opens the input, asks the model / presenter, and closes the output.** Details in [action.md](./action.md) §2.1)
+3. **Shared pure processing (non-display) that belongs to no table's Domain → a non-model util ([model.md](./model.md) §4)**
+4. **Assembling the contract response → the action. Deriving shared display values → the presenter ([model.md](./model.md) §3.11). Screen-specific presentation and on-screen ordering → the frontend (feature / scene)**
+   (never put display-only or screen-only concerns in a model. The FE side is authoritative in [frontend/viewpart-components.md](../frontend/viewpart-components.md) §9)
+5. **The row order of a list or a candidate set (the fetch order per the contract) → SQL's `ORDER BY` (in the routine query or the fragment). Never re-sort in PHP after fetching.**
+   The FE may only reorder in ways that do not change the contractual row order ([model.md](./model.md) §3.4)
 
-補足:
+Notes:
 
-- Domain の独立ディレクトリは作らない。
-- model が Domain＋永続化を同居するのは妥協ではなく、**crow における Domain の正規の住所**。
-- Domain と Infrastructure を model 外で分離しようとしない。
-- **クエリ組み立てのための巨大な横断クラスは新設しない。**
-  `common_presenter` は**表示専用の薄い共有**に限る（[model.md](./model.md) §3.11）。置き場に迷ったら [model.md](./model.md) の §3 / §3.11 / §3.12 / §4 の判定表で割り振る。
-  ここで禁じているのは**寄せ集めのクエリ工場・何でも入る横断ゴミ箱**であって、
-  業務概念名で 1 関心に絞った**ドメインサービス（[model.md](./model.md) §3.12）は禁止対象ではない**。
+- Do not create a separate Domain directory.
+- A model housing Domain and persistence together is not a compromise — it is **Domain's legitimate address in crow**.
+- Do not try to separate Domain from Infrastructure outside the model.
+- **Never introduce a giant cross-cutting class for assembling queries.**
+  `common_presenter` is limited to **a thin, display-only shared surface** ([model.md](./model.md) §3.11). When unsure where something goes, allocate it with the decision tables in [model.md](./model.md) §3 / §3.11 / §3.12 / §4.
+  What is forbidden here is **a catch-all query factory or a cross-cutting junk drawer** — a
+  **domain service named for a business concept and narrowed to one concern ([model.md](./model.md) §3.12) is not forbidden**.
 
-流れのイメージ:
+The shape of the flow:
 
 ```
-action:     入力を開く → model / service / presenter に頼む → 契約どおりに出力を閉じる
-model:      主語テーブルの意味・判定・定型クエリ・保存フック
-service:    複数表にまたがり主語を決められない業務判定・導出（Domain）
-presenter:  契約に載せる共有表示値（表単位 / 表非依存の共通形）
-util:       表に属さない共有の純粋処理（非表示）だけ
-FE:         契約 payload を受け、画面固有の見せ方・並びを組み立てる
+action:     open the input → ask the model / service / presenter → close the output per the contract
+model:      the subject table's meaning, decisions, routine queries, and save hooks
+service:    business decisions and derivations spanning several tables with no determinable subject (Domain)
+presenter:  shared display values that go on the contract (per table / in a table-independent common shape)
+util:       only shared pure processing (non-display) that belongs to no table
+FE:         receives the contract payload and assembles the screen-specific presentation and ordering
 ```
 
-### 1.1 システム責務と業務責務の境界（backend 全葉で最優先の不変則）
+### 1.1 The boundary between system responsibility and business responsibility (the highest-priority invariant across all backend leaves)
 
-**backend のどの葉・どの節よりもこの節が優先する。** 以下と矛盾する読み方をしたら、本節が勝つ。
+**This section takes precedence over every backend leaf and every section.** If a reading conflicts with the below, this section wins.
 
-| | システム責務 | 業務（Domain）責務 |
+| | System responsibility | Business (Domain) responsibility |
 | --- | --- | --- |
-| **住所** | `action_*`（および `module_*` の `preload()`） | `model_<table>` / `model_<table>_<table>_service` |
-| **持ちもの** | 入力・出力・**終了**・Tx 境界・DB ハンドル・認証・セッション・致命ログ | 表／業務概念の意味・判定・導出・整合・業務メッセージ文言 |
-| **知ってよいこと** | 「誰にどう頼み、結果を見てどう返すか」 | **自分の業務だけ。** リクエストが何か、どう返るか、いつ終わるかを知らない |
+| **Address** | `action_*` (and `preload()` in `module_*`) | `model_<table>` / `model_<table>_<table>_service` |
+| **What it owns** | input, output, **termination**, Tx boundaries, the DB handle, auth, the session, fatal logging | the meaning, decisions, derivations, and consistency of a table or business concept, and the wording of business messages |
+| **What it may know** | "who to ask, how, and how to respond given the result" | **only its own business.** It does not know what the request is, how it returns, or when it ends |
 
-> **本節で「Domain 側」と言うとき**は、**action から呼ばれる側のファイルすべて**を指す——
-> `model_*` / `model_*_service` / `model_*_presenter` / 非モデル util（住所と書き方は [model.md](./model.md) §3・§4）。
-> presenter と util は層としては Domain ではないが、**システム責務を持たない点は同じ**なので、
-> 以下の禁止は 4 つとも同じ強さで効く。
+> **When this section says "the Domain side"**, it means **every file called from an action** —
+> `model_*` / `model_*_service` / `model_*_presenter` / non-model utils (addresses and style in [model.md](./model.md) §3, §4).
+> Presenters and utils are not Domain as a layer, but **they equally hold no system responsibility**, so
+> all four are bound by the prohibitions below with the same force.
 
-**システム責務のシンボル（Domain 側のファイルに 1 つも書かない）**
+**Symbols of system responsibility (never write a single one of them in a Domain-side file)**
 
-| 種別 | シンボル |
+| Kind | Symbol |
 | --- | --- |
-| 入出力 | `crow_request::*` / `crow_response::*` |
-| **プログラムの終了** | `app::exit_ok()` / `app::exit_ng()` / `app::exit_*()` / `exit` / `die` / `header()` / redirect |
-| トランザクション境界 | `$hdb->begin()` / `commit()` / `rollback()` |
-| DB ハンドルの取得 | `crow::get_hdb()`（必要なら**引数で受け取る**。[query.md](./query.md) §3.9） |
-| 認証・進行制御 | `crow_auth::*` |
-| セッション・Cookie・スーパーグローバル | `$_GET` / `$_POST` / `$_SESSION` 等 |
-| 致命ログ | `crow_log::error()`（crow の設定次第で**リクエストを exit させる**＝終了と同義。[action.md](./action.md) §2.10） |
+| I/O | `crow_request::*` / `crow_response::*` |
+| **Terminating the program** | `app::exit_ok()` / `app::exit_ng()` / `app::exit_*()` / `exit` / `die` / `header()` / redirect |
+| Transaction boundaries | `$hdb->begin()` / `commit()` / `rollback()` |
+| Obtaining the DB handle | `crow::get_hdb()` (**receive it as an argument** where needed — [query.md](./query.md) §3.9) |
+| Auth and flow control | `crow_auth::*` |
+| Session, cookies, superglobals | `$_GET` / `$_POST` / `$_SESSION`, and so on |
+| Fatal logging | `crow_log::error()` (depending on crow's configuration it **exits the request** — the same as terminating. [action.md](./action.md) §2.10) |
 
-**絶対則（2 本）**
+**Two absolute rules**
 
-> **1. Domain はプログラムを終わらせない。**
-> `model_*` / `model_*_service` / `model_*_presenter` / util の中に、リクエストを終了させうる呼び出しを **1 つも書かない**。
-> 異常は **戻り値（`false` / `''` / エラー配列）** か **`push_validation_error()` / `get_last_error()`** で呼び手に返し、
-> **止めるか進めるかは action が決める**（[action.md](./action.md) §2.3）。
+> **1. The Domain never ends the program.**
+> Never write **a single** call that could terminate the request inside `model_*` / `model_*_service` / `model_*_presenter` / a util.
+> Return an abnormality to the caller as **a return value (`false` / `''` / an error array)** or via **`push_validation_error()` / `get_last_error()`**,
+> and **let the action decide whether to stop or continue** ([action.md](./action.md) §2.3).
 >
-> **2. Domain はシステムの勝手を知らない。**
-> 上表のシンボルが Domain 側に現れたら、それは「例外的に許される最適化」ではなく**設計の誤り**である。
+> **2. The Domain does not know the system's business.**
+> A symbol from the table above appearing on the Domain side is not "an optimization permitted as an exception" — it is **a design error**.
 
-**なぜ絶対か**（例外を作ると全部壊れる）
+**Why they are absolute** (make one exception and it all breaks)
 
-1. Domain が exit すると、**単体テストがプロセスごと落ちて書けない**（[backend/testing.md](./testing.md) の Red 対象は手書き Domain）。
-2. 同じ判定を**別経路（別 action・バッチ・CLI）から再利用できない**。
-3. **Tx の途中で終了して中間状態が残る**（rollback は action にしか書けない。[action.md](./action.md) §2.8）。
+1. When the Domain exits, **the unit test dies with the process and cannot be written** (the Red targets in [backend/testing.md](./testing.md) are hand-written Domain).
+2. The same decision **cannot be reused from another route** (another action, a batch, a CLI).
+3. **Termination mid-Tx leaves intermediate state behind** (a rollback can only be written in the action — [action.md](./action.md) §2.8).
 
-**Domain から出してよい唯一の記録は `crow_log::warning()`**（終了しない）。[action.md](./action.md) §2.10 に従う。
+**The only record the Domain may emit is `crow_log::warning()`** (which does not terminate). Follow [action.md](./action.md) §2.10.
 
-自己点検の grep は §6。
+The self-check grep is §6.
 
 ---
 
-### 1.2 葉の索引（書く住所 → 開く葉）
+### 1.2 Leaf index (the address you write → the leaf you open)
 
-backend 規約は**住所ごとに葉が分かれている**。本葉（境界の核）は常に読み、**そのうえで自分が書く住所の葉だけ**を開く。
+The backend rules **are split per address**. Always read this leaf (the core of the boundary), and **on top of that open only the leaf for the address you write**.
 
-| 書く／直す住所 | 開く葉 | 中身 |
+| Address you write / fix | Leaf to open | Content |
 | --- | --- | --- |
-| `module_*.php` の `action_*`・`preload()` | [action.md](./action.md) | §2. ユースケースの骨格・リクエスト／レスポンス・Tx・認証ゲート・ログ |
-| `app/classes/_common_/` の PHP<br/>（`model_*` / `model_*_*_service` / `model_*_presenter` / 非モデル util） | [model.md](./model.md) | §3・§4. Domain の住所・拡張フック・presenter・ドメインサービス・util |
-| `app/assets/query/**` の `.sql`（＋それを組み立てる model のメソッド） | [query.md](./query.md) | §3.9. raw フラグメント・allow-list・ページャ付き一覧 |
-| `db_design.txt` | [db.md](./db.md) | DB 設計の書式と住所 |
-| テストコード | [testing.md](./testing.md) | PHPUnit・Red の対象／非対象 |
+| `action_*` and `preload()` in `module_*.php` | [action.md](./action.md) | §2. The skeleton of a use case, request/response, Tx, the auth gate, logging |
+| PHP under `app/classes/_common_/`<br/>(`model_*` / `model_*_*_service` / `model_*_presenter` / non-model utils) | [model.md](./model.md) | §3, §4. Domain addresses, extension hooks, presenters, domain services, utils |
+| `.sql` under `app/assets/query/**` (and the model methods that assemble it) | [query.md](./query.md) | §3.9. Raw fragments, the allow-list, paginated lists |
+| `db_design.txt` | [db.md](./db.md) | The format and location of the DB design |
+| Test code | [testing.md](./testing.md) | PHPUnit; what is and is not a Red target |
 
-- **1 スライスで action と model の両方を書くなら、両方の葉を開く。** 触らない住所の葉は開かない。
-- **節番号は backend 規約全体の通し番号**である（本葉 §1 → `action.md` §2 → `model.md` §3・§4／`query.md` §3.9 → 本葉 §5・§6・§7）。
-  分割後も番号を振り直さない——他葉・他規約からの参照を切らないため。
-- 迷ったら本葉 §1 の判定表・§1.1 の境界に戻る。**葉を開かずに勘で書かない。**
-
----
-
-## 5. 既存コードを触るとき
-
-- `action_*` に主語が一意な判定・定型クエリがベタ書きされていたら、
-  **その機能の実装スコープ内だけ** 主語 model へ移す。
-- `action_*` に**複数表にまたがる業務判定**がベタ書きされていたら、
-  **その機能の実装スコープ内だけ** [model.md](./model.md) §3.12 の service へ移す（新設してよい）。
-- Domain（model / service / presenter / util）に `exit_*` / Tx / `crow_request` / `crow::get_hdb()` が
-  混ざっていたら、**触る機能のスコープ内だけ** §1.1 の形（Domain は値を返し、action が止める）に直す。
-  **これは「既存に合わせる」ことを許さない**——新しく書くコードでこの形を踏襲しない。
-- model や module に表示用整形が溜まっていたら、
-  **触る機能のスコープ内だけ** [model.md](./model.md) §3.11 の判定で presenter へ移す。
-- 横断クラスに定型取得や行整形が溜まっているのを見つけたら、
-  **触る機能のスコープ内だけ** [model.md](./model.md) の §3 / §3.11 / §4 の判定表で割り振る（一括解体はしない）。
-- **一括リライトはしない。**
-- 未拡張テーブルにドメインが載るなら、そのスコープで
-  `app/classes/_common_/model_<table>.php` を生やす。
+- **If one slice has you writing both an action and a model, open both leaves.** Do not open leaves for addresses you do not touch.
+- **Section numbers run through the backend rules as a whole** (this leaf §1 → `action.md` §2 → `model.md` §3, §4 / `query.md` §3.9 → this leaf §5, §6, §7).
+  Do not renumber after a split — that would break references from other leaves and other rules.
+- When unsure, return to the decision table in §1 and the boundary in §1.1. **Never write on instinct without opening a leaf.**
 
 ---
 
-## 6. 責務の自己点検（サーバ側を書いたら、返す前に必ず）
+## 5. When you touch existing code
 
-**§1.1 は目視だけに頼らない。** 書き終えたら次を実行する。
+- If an `action_*` has a decision or routine query with a single determinable subject hardcoded into it,
+  move it to the subject model, **only within the implementation scope of that feature**.
+- If an `action_*` has a **business decision spanning several tables** hardcoded into it,
+  move it to a service per [model.md](./model.md) §3.12, **only within the implementation scope of that feature** (creating one is fine).
+- If `exit_*` / Tx / `crow_request` / `crow::get_hdb()` are mixed into the Domain (model / service / presenter / util),
+  fix them into the §1.1 shape (the Domain returns a value; the action stops), **only within the scope of the feature you touch**.
+  **This does not license "matching the existing code"** — never follow that shape in code you write anew.
+- If display formatting has accumulated in a model or a module,
+  move it to a presenter by the [model.md](./model.md) §3.11 decision, **only within the scope of the feature you touch**.
+- If you find routine fetches or row formatting accumulated in a cross-cutting class,
+  allocate them with the decision tables in [model.md](./model.md) §3 / §3.11 / §4, **only within the scope of the feature you touch** (do not dismantle it wholesale).
+- **Never do a bulk rewrite.**
+- If domain logic lands on a table with no extension yet, grow
+  `app/classes/_common_/model_<table>.php` within that scope.
+
+---
+
+## 6. Self-checking responsibilities (always, after writing server-side code, before returning)
+
+**Do not rely on §1.1 by eye alone.** When you have finished writing, run the following.
 
 ```bash
 #	Domain 側（model / service / presenter / util）にシステム責務が漏れていないか
@@ -165,42 +167,41 @@ grep -rnE "crow_request|crow_response|app::exit_|crow_auth::|crow::get_hdb|crow_
 	app/classes/_common_/
 ```
 
-**ヒットしたら §1.1 に照らして判断する。**
-自分が今回書いた行なら**直してから返す**。既存行なら §5（触る機能のスコープ内だけ直す）に従い、
-スコープ外で直さないものは**報告に残す**（黙って見送らない）。
-コメント・文字列リテラルへの偶発一致は、その旨を確認したうえで見送ってよい——
-**ただし「たぶんコメントだろう」で済ませず、必ず該当行を開いて確かめる。**
+**If it hits, judge against §1.1.**
+If it is a line you wrote this round, **fix it before returning**. If it is an existing line, follow §5 (fix only within the scope of the feature you touch),
+and **leave what you did not fix out of scope in your report** (never let it pass silently).
+An incidental match inside a comment or a string literal may be passed over once confirmed as such —
+**but never settle for "it's probably a comment": always open the line and check.**
 
-続けて、grep で取れない分を読んで確かめる。
+Then read and confirm what grep cannot catch.
 
-- [ ] `action_*` を上から読んで、**入力 → 委譲 → 出力**の 3 段だけになっているか（[action.md](./action.md) §2.1）
-- [ ] `action_*` の中に、**業務の条件式**（`&&` / `||` で組んだ業務ルール・状態遷移の判定）が残っていないか。
-      1 表なら model、**複数表なら [model.md](./model.md) §3.12 service** へ移す
-- [ ] Domain が**異常を戻り値で返し**、止める判断を action に委ねているか（§1.1 絶対則 1）
-- [ ] `begin()` したすべての経路で、`exit_ng` の前に `rollback()` しているか（[action.md](./action.md) §2.8）
-- [ ] 新設した service の名前が **またがる表名の連結（アルファベット順）＋ `_service`** になっているか。
-      業務概念名になっていないか。**同じ組み合わせの既存 service を見落として二重に作っていないか**
-      （`ls app/classes/_common_/model_*_service.php` で確認する）。
-      既存メソッドが見る表を増やしたなら、クラス名も追随しているか（[model.md](./model.md) §3.12）
-- [ ] Domain に書いたメソッドが、**行オブジェクト／配列を渡すだけで単体テストできる**か
-      （できないなら、まだシステムの都合が混ざっている）
+- [ ] Reading `action_*` top to bottom, is it only the 3 stages of **input → delegation → output** ([action.md](./action.md) §2.1)?
+- [ ] Does any **business conditional** remain inside `action_*` (a business rule or a state-transition decision built from `&&` / `||`)?
+      Move it to a model for one table, or to a **[model.md](./model.md) §3.12 service for several tables**
+- [ ] Does the Domain **return abnormalities as return values**, leaving the decision to stop to the action (§1.1 absolute rule 1)?
+- [ ] On every route that called `begin()`, is there a `rollback()` before `exit_ng` ([action.md](./action.md) §2.8)?
+- [ ] Is a newly created service named as **the concatenation of the table names it spans (alphabetical) + `_service`**?
+      Is it named for a business concept instead? **Did you miss an existing service for the same combination and create a duplicate?**
+      (check with `ls app/classes/_common_/model_*_service.php`).
+      If an existing method grew to look at more tables, did the class name follow ([model.md](./model.md) §3.12)?
+- [ ] Can a method you wrote in the Domain **be unit-tested just by passing a row object or an array**?
+      (if not, the system's business is still mixed in)
 
 ---
 
-## 7. ここに書くもの（育て方）
+## 7. What goes here (how this grows)
 
-サーバ側にだけ効く規約が出てきたら、**その規約が効く住所の葉**に追記する（§1.2 の索引と同じ割り方）。
+When a rule emerges that binds only the server side, add it to **the leaf for the address that rule binds** (the same split as the §1.2 index).
 
-| 追記したい内容 | 追記先 | `paths`（ロード契機） |
+| What you want to add | Where it goes | `paths` (the load trigger) |
 | --- | --- | --- |
-| 住所をまたいで効く不変則・層の境界・自己点検 | 本葉 `coding.md` | サーバ側の全住所 |
-| action の書き方 | [action.md](./action.md) | `module_*.php` |
-| model / service / presenter / util の書き方 | [model.md](./model.md) | `app/classes/**` |
-| `.sql` フラグメントの書き方 | [query.md](./query.md) | `app/assets/query/**` |
+| An invariant spanning addresses, a layer boundary, a self-check | this leaf, `coding.md` | every server-side address |
+| How to write an action | [action.md](./action.md) | `module_*.php` |
+| How to write a model / service / presenter / util | [model.md](./model.md) | `app/classes/**` |
+| How to write a `.sql` fragment | [query.md](./query.md) | `app/assets/query/**` |
 
-- **本葉を太らせない。** ここが太ると全住所で読み込まれる。住所固有の話は必ず住所の葉へ。
-- **葉を足すときは `paths` を必ず絞る**（住所を特定できないなら、それは住所固有の規約ではない＝本葉に書くべき不変則か、
-  そもそも [common/coding.md](../common/coding.md) 行きかを先に判定する）。
-- **責務境界の正本は §1.1** であり、他葉はそこを参照する（各葉に禁止事項を写経しない）。
-- **節番号は通し番号を維持する**（§1.2）。葉をまたいで参照されているので振り直さない。
-- **frontend にも効く話になった時点で、backend ではなく [common/coding.md](../common/coding.md) へ上げる。**
+- **Do not let this leaf grow fat.** Fat here means it is loaded at every address. Address-specific matters always go to that address's leaf.
+- **Always narrow `paths` when adding a leaf** (if you cannot pin an address, it is not an address-specific rule — first decide whether it is an invariant that belongs in this leaf, or belongs in [common/coding.md](../common/coding.md) altogether).
+- **The boundary of responsibilities is authoritative in §1.1**, and other leaves reference it (never transcribe the prohibitions into each leaf).
+- **Keep the section numbers running** (§1.2). They are referenced across leaves, so do not renumber.
+- **The moment something also binds the frontend, promote it out of backend into [common/coding.md](../common/coding.md).**

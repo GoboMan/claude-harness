@@ -21,69 +21,77 @@ paths:
   - "**/*.html"
 ---
 
-# 💬 コード内コメントは「現在の仕様」だけを書く
+# 💬 In-code comments describe only the current spec
 
-> **適用範囲: 全 platform / 全 framework のプロダクションコードとテストコード。**
-> framework 固有の記法（docコメントの形式など）は各 framework の `coding.md` が上書きする。
-> 本書が定めるのは**何を書き、何を書かないか**だけである。
-> **新しい framework を harness に足したら、その言語の拡張子を上の `paths:` に追加する**
-> （全 platform に効く葉なので、被覆が落ちると本書だけ配送されなくなる）。
-
----
-
-## 1. 原則
-
-**コメントは、そのコードを今読む人が現在の仕様を理解するために書く。**
-変更の経緯・作業ログ・過去の状態は、**コードには残さない。**
-
-理由: 経緯は git（commit message）と ADR に既にある。コードに写すと二重管理になり、
-次の変更で更新されず、**古い履歴が現在の仕様として読まれる**事故になる。
+> **Scope: production code and test code, on every platform and every framework.**
+> Framework-specific notation (the form of doc comments, and so on) is overridden by each
+> framework's `coding.md`. What this document defines is only **what to write and what not to write**.
+> **When you add a new framework to the harness, add that language's extensions to the `paths:` above**
+> (this leaf binds every platform, so a gap in the coverage means this document alone stops being delivered).
 
 ---
 
-## 2. 書かないもの（見つけたら消す）
+## 0. Language
 
-- 過去との差分: 「以前は〜だったが〜に変更」「旧実装では〜」「〜の対応で修正」
-- 作業ログ・日付・担当者・チケット番号だけのメモ（`// 2026-08-14 修正`）
-- コメントアウトされた旧コード（**git にあるので消す。「念のため残す」をしない**）
-- 変更の意図の説明（「なぜこの改修をしたか」）——それは commit message／ADR の持ち物
-- コードを読めば分かることの言い換え（`// ユーザーを取得する` の直後に `getUser()`）
-
-## 3. 書いてよいもの
-
-- 読んでも分からない**理由・制約**（外部仕様の癖、意図的に非効率な選択、回避しているバグ）
-- 壊れやすい前提・不変則（「呼び出し側で排他済みであること」など）
-- framework／言語の規約が要求する doc コメント（各 `coding.md` に従う）
-
-いずれも**現在形で、今の仕様として**書く。「〜に変更した」ではなく「〜である」。
+**Write comments in Japanese.** These rules are written in English for token density, but that is a
+property of the instructions, not of the code. Identifiers, API names, and framework keywords stay as
+they are; only prose is Japanese.
 
 ---
 
-## 4. 経緯の宛先
+## 1. The principle
 
-| 書きたいこと | 宛先 |
+**A comment exists so that whoever reads this code now understands the current spec.**
+The history of a change, a work log, a past state — **none of it stays in the code.**
+
+Why: the history is already in git (the commit message) and in ADRs. Copying it into the code creates
+a second copy that the next change does not update, and **stale history gets read as the current spec.**
+
+---
+
+## 2. What not to write (delete it when you find it)
+
+- Diffs against the past: "it used to be X but was changed to Y", "in the old implementation…", "fixed for Z"
+- Work logs, dates, assignees, or notes that are only a ticket number (`// 2026-08-14 修正`)
+- Commented-out old code (**it is in git, so delete it. Never "keep it just in case"**)
+- Explanations of the intent behind a change ("why this modification was made") — that belongs to the commit message / ADR
+- Restatements of what the code already says (`// ユーザーを取得する` directly above `getUser()`)
+
+## 3. What may be written
+
+- **Reasons and constraints** that reading cannot reveal (quirks of an external spec, a deliberately inefficient choice, a bug being worked around)
+- Fragile premises and invariants ("the caller has already taken the lock", and the like)
+- Doc comments required by the framework's or language's conventions (follow each `coding.md`)
+
+All of it **in the present tense, as the current spec**. Not "changed to X" but "is X".
+
+---
+
+## 4. Where history belongs
+
+| What you want to write | Destination |
 | --- | --- |
-| 何をなぜ変えたか | git commit message |
-| 設計判断の理由・トレードオフ | `docs/adr/` |
-| 現在の振る舞い・規則 | `docs/specs/F-xxx-<slug>/spec.md` |
-| 今のコードが今こうである理由 | コード内コメント（本書） |
+| What was changed and why | git commit message |
+| The reasoning and trade-offs behind a design decision | `docs/adr/` |
+| The current behavior and rules | `docs/specs/F-xxx-<slug>/spec.md` |
+| Why the code as it is now is the way it is | an in-code comment (this document) |
 
 ---
 
-## 5. 既存の履歴コメント
+## 5. Existing history comments
 
-**触ったファイルの範囲で消す。** 一括掃除を別作業として起票しない。
+**Delete them within the range of the files you touched.** Do not file a bulk cleanup as separate work.
 
-- 履歴コメントが現在の仕様の説明を兼ねているなら、**現在形に書き直してから**履歴部分を落とす
-- 内容が現在も正しいか確認できないコメントは、コードを正として判断する（コメントを根拠に実装を変えない）
-- 掃除は**その変更と同じコミットの一部**として扱い、別の論理変更に切らない。掃除を行ったら報告に 1 行残す
+- If a history comment doubles as an explanation of the current spec, **rewrite it in the present tense first**, then drop the history part
+- For a comment whose continued correctness you cannot confirm, judge with the code as authoritative (never change an implementation on the grounds of a comment)
+- Treat the cleanup as **part of the same commit as that change**, not as a separate logical change. If you cleaned something up, leave one line about it in your report
 
 ---
 
-## ✅ 返す前チェックリスト
+## ✅ Checklist before returning
 
-- [ ] 「以前は」「変更しました」「〜対応」の類が残っていないか
-- [ ] コメントアウトされたコードを残していないか
-- [ ] 日付・担当者・チケット番号だけのメモが無いか
-- [ ] 残したコメントが、コードを読めば分かることの言い換えになっていないか
-- [ ] 経緯は commit message／ADR に回したか
+- [ ] Nothing of the "it used to be", "changed", "fixed for" kind is left
+- [ ] No commented-out code is left
+- [ ] No notes that are only a date, an assignee, or a ticket number
+- [ ] No comment you kept is merely a restatement of what the code says
+- [ ] The history was routed to the commit message / ADR
