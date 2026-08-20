@@ -3,59 +3,61 @@ paths:
   - "**/*.swift"
 ---
 
-# 🚦 SwiftUI — テスト実行の回し方（シミュレータは共有リソース）
+# 🚦 SwiftUI — how test runs are driven (the simulator is a shared resource)
 
-> **適用範囲: SwiftUI を使うネイティブ iOS アプリのうち、既定スイートの実行に
-> シミュレータ destination を要する構成**（アプリターゲットを `xcodebuild test` で回す等）。
-> `swift test` だけで既定スイートが閉じる構成では排他が起きないので、本書の制限は適用しない
-> （各 producer が従来どおり自分で緑まで回す）。判断が付かなければ、取り込み先 `CLAUDE.md` の
-> 既定スイート実行コマンドを見る。
+> **Scope: SwiftUI native iOS apps whose default suite requires a simulator destination to run**
+> (running the app target through `xcodebuild test`, and the like).
+> Where the default suite closes with `swift test` alone, no exclusivity arises and this document's restrictions do not apply
+> (each producer drives itself to green as usual). If you cannot tell, look at the host `CLAUDE.md`'s
+> default-suite run command.
 >
-> テストの**書き方**は [testing.md](./testing.md)、記法は [coding.md](./coding.md)。
-> 本書が定めるのは **テストを誰がいつ実行するか** だけである。
+> **How to write** tests is [testing.md](./testing.md); notation is [coding.md](./coding.md).
+> What this document defines is only **who runs the tests, and when**.
+>
+> **Write reports in Japanese.**
 
 ---
 
-## 1. シミュレータ／ビルドロックを掴む処理は同時に 1 本
+## 1. Only one process at a time may take the simulator / build lock
 
-シミュレータ・DerivedData・ビルドロックは**単一の共有資源**である。
-並行起動された Task がそれぞれ叩くと、多重起動・ビルドの取り合い・原因不明のフレークが起き、
-**並列化した分より遅くなる。**
-
----
-
-## 2. 並行区間では実行を見送る
-
-- 並行して走っている producer は**テストの実行**（`xcodebuild test`、テスト用の `simctl boot`）を行わない。
-  編集・型検査・lint・シミュレータを要さないビルドまでで止める。
-- 見送ったら、**「テスト未実行」であることと、実行すべきスイート（対象の機能 ID）を報告に明示して返す。**
-  自分で緑を確認できないことを黙って完了扱いにしない。
-- **例外 1: 起票直後の Red 確認**（新規テストだけの指定実行）は行ってよい。まだ実装体が動いておらず
-  実行が 1 本に収まる局面であり、ここを飛ばすとテストファーストの担保が失われるため。
-  **他 Task の実行状況は観測できないので、判定できないなら実行してよい**（この局面は 1 本に収まる）。
-- **例外 2: 見た目確認のためのシミュレータ起動**（人間ゲート）は禁止対象ではない。
-- 例外に乗ってよいのは上の 2 つだけで、**§1 を破ってまで広げない。**
+The simulator, DerivedData, and the build lock are **a single shared resource**.
+When concurrently launched Tasks each hit them, you get multiple launches, contention over the build, and flakes with no traceable cause —
+**and it ends up slower than not parallelizing at all.**
 
 ---
 
-## 3. 集約実行（並行区間を閉じた後）
+## 2. Skip execution inside a concurrent section
 
-並行区間が閉じたら、**単独で走る 1 体**（実装 producer を単独で再起動してよい）がまとめて実行し、
-**そこで赤緑を確定する。** 並行中に見送った Red → Green は、この回で閉じる。
-
-1. **destination を 1 つに固定する。** デバイス名・OS バージョンは取り込み先の `CLAUDE.md` に宣言し、毎回同じものを使う。
-2. **ブート済みシミュレータを使い回す。** 実行のたびに作成・削除・再起動をしない。
-3. **`xcodebuild` を 2 本同時に走らせない**（並列テスト実行のオプションでプロセスを多重化することも含む）。
-4. 修正ループ中は機能 ID の指定実行で回し、フル実行は境界（返す直前・commit 前・CI）に寄せる。
-5. 終了コードで赤緑を採る。**誰も実行しないまま次工程へ渡さない。**
-
-赤が出たあとの束ね方・差し戻しのラウンドは develop skill の規則に従う（ここでは定めない）。
+- A producer running concurrently **does not run tests** (`xcodebuild test`, a `simctl boot` for testing).
+  Stop at editing, type checking, lint, and builds that need no simulator.
+- Having skipped, **state explicitly in your report that the tests are unexecuted and which suite (the target feature ID) needs to run.**
+  Never silently treat "I could not confirm green myself" as complete.
+- **Exception 1: the Red check right after filing** (a selective run of the new tests only) is permitted. The implementers are not running yet
+  and the execution fits into a single process, and skipping it would lose the test-first guarantee.
+  **You cannot observe other Tasks' execution, so if you cannot tell, go ahead and run** (this moment fits into one process).
+- **Exception 2: launching the simulator to check the appearance** (a human gate) is not forbidden.
+- Only these 2 exceptions apply; **never widen them at the cost of §1.**
 
 ---
 
-## ✅ 返す前チェックリスト
+## 3. The consolidated run (after the concurrent section closes)
 
-- [ ] 並行区間中にテストを実行していないか。見送ったなら、その旨と対象スイートを報告に書いたか
-- [ ] 集約実行で赤緑を確定したか（未実行のまま完了扱いにしていないか）
-- [ ] destination が固定で、`CLAUDE.md` の宣言と一致しているか
-- [ ] 同時に走っている `xcodebuild` が 1 本だけか
+Once the concurrent section closes, **one agent running alone** (relaunching an implementation producer alone is fine) runs them all,
+**and settles red/green there.** The Red → Green skipped during the concurrent section closes in this round.
+
+1. **Pin the destination to one.** Declare the device name and OS version in the host's `CLAUDE.md` and use the same one every time.
+2. **Reuse an already-booted simulator.** Do not create, delete, or restart one per run.
+3. **Never run two `xcodebuild` processes at once** (including multiplying processes via the parallel-test-execution option).
+4. During the fix loop, run the selection by feature ID; push full runs to the boundaries (before returning, before commit, in CI).
+5. Take red/green from the exit code. **Never hand anything to the next phase with nobody having run it.**
+
+How findings are bundled after a red, and the rework rounds, follow develop skill's rules (not defined here).
+
+---
+
+## ✅ Checklist before returning
+
+- [ ] Did you run tests during a concurrent section? If you skipped, did you say so and name the target suite in your report?
+- [ ] Did the consolidated run settle red/green? (are you treating something unexecuted as complete?)
+- [ ] Is the destination pinned and matching the declaration in `CLAUDE.md`?
+- [ ] Is only one `xcodebuild` running at a time?
