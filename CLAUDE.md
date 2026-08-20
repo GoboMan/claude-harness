@@ -1,167 +1,170 @@
-# CLAUDE.md — claude-harness 自体の開発ガイド
+# CLAUDE.md — the development guide for claude-harness itself
 
-このリポジトリは **オンデマンド型ルーティング（Prompt as Code）の共通プロンプト** である。  
-ここで触るのは「アプリの業務コード」ではなく、**AI が必要な瞬間だけルールをロードするための配線（`.claude/`）** である。
+This repository is **the shared prompt for on-demand routing (Prompt as Code)**.
+What you touch here is not an application's business code but **the wiring (`.claude/`) that lets an AI load rules only at the moment it needs them**.
 
-思想・ディレクトリ地図・導入手順の全文は [`README.md`](./README.md)。本ファイルは **harness を改修・拡張するときの作業指針**だけを載せる。
+The full text of the philosophy, the directory map, and the setup procedure is in [`README.md`](./README.md). This file carries **only the working guidance for modifying and extending the harness**.
 
----
-
-## 0. このリポジトリでやってはいけないこと
-
-- **常駐ゼロを崩さない。** `index.md` やカタログ目次を復活させない。`settings.json` に自動注入を足さない（現状 `{}`）。
-- **プロジェクト固有の逸脱をここに書かない。** 共有 harness は汎用のみ。案件ごとの事実は、取り込み先プロジェクトの `CLAUDE.md` へ。
-- **同じ知識を二重化しない。** 書式の SSOT は 1 箇所（rules の葉・`templates/` のテンプレート・または生成する agent body）。skill に craft / 書式をコピペしない。docs 成果物の書式はテンプレートが正で、spec-lint は必須項目をテンプレートから導出する（lint 側に書式を再記述しない）。
-- **`.cursor/` を手で編集しない。** Cursor 射影は生成物。直すなら `.claude/` を直し `./init.sh cursor`（または `.claude/tools/cursor-sync/sync.sh`）で再生成。
+> **Language policy.** Everything under `.claude/` (skills, agents, rules, tool READMEs, and the guidance comments inside templates) is written **in English**, for token density. That is a property of the prompt, not of the work: **conversation with the user is in Japanese**, and **so are the deliverables** — the docs under `docs/specs/`, ADRs, commit messages, and in-code comments. The templates in `.claude/templates/develop/` therefore keep Japanese headings and frontmatter keys, and `README.md` stays in Japanese. When you add or edit anything here, follow that split.
 
 ---
 
-## 1. 統治ルール（改修前に必ず確認）
+## 0. What you must never do in this repository
 
-> **ある階層の `.md` ＝ その抽象度のルール／サブフォルダ ＝ さらに具体化した特殊化。深いほど具体的。**  
-> **ツリーの軸は「種類(kind)」であって「プロジェクト」ではない。**
+- **Never break zero-residency.** Never revive an `index.md` or a catalog table of contents. Never add automatic injection to `settings.json` (currently `{}`).
+- **Never write project-specific deviations here.** The shared harness holds only what is generic. Facts about a particular engagement go in the host project's `CLAUDE.md`.
+- **Never duplicate the same knowledge.** A format has exactly one SSOT (a rules leaf, a template under `templates/`, or the agent body being generated). Never copy craft or format into a skill. The format of a docs artifact is authoritative in the template, and spec-lint derives its required items from the template (never restate the format on the lint side).
+- **Never hand-edit `.cursor/`.** The Cursor projection is generated output. To fix something, fix `.claude/` and regenerate with `./init.sh cursor` (or `.claude/tools/cursor-sync/sync.sh`).
 
-| 原則 | 意味 |
+---
+
+## 1. Governing rules (always check before modifying)
+
+> **The `.md` at a level = the rules at that level of abstraction / a subfolder = a further specialization. Deeper means more specific.**
+> **The tree's axis is the kind, not the project.**
+
+| Principle | What it means |
 | --- | --- |
-| 常駐ゼロ | ベースラインに載るルールは 0。発見は `paths` ゲートと skill 起動だけ |
-| 3木揃え | 手続きキー `<key>` は `skills/<key>`・`agents/<key>`・`rules/<key>` で同名 |
-| 作る ≠ 判定する | producer と oracle/reviewer/attacker/judge は別 agent・別コンテキスト |
-| skill = 回し方 | orchestrator の判断核・台本のみ。型は rules／templates、craft は agent body |
-| 参照は rules → skill の一方通行 | **葉は skill を参照してよい**（「手続きの正本は skill §X」）。**skill は葉の本文を知らない**——見てよいのは配送に要るメタ情報（ディレクトリ位置・ファイル名・`paths:`）だけで、本文の要約・抜粋・節番号を skill に書かない。規約の中身を知るのは**葉を渡された agent** であって、配る側ではない |
+| Zero residency | Zero rules ride on the baseline. Discovery happens only through the `paths` gate and a skill invocation |
+| Three aligned trees | A procedure key `<key>` has the same name under `skills/<key>`, `agents/<key>`, and `rules/<key>` |
+| Building ≠ judging | The producer and the oracle / reviewer / attacker / judge are different agents in different contexts |
+| A skill is how it is driven | Only the orchestrator's decision core and script. Types live in rules and templates; craft lives in the agent body |
+| References run one way, rules → skill | **A leaf may reference a skill** ("the procedure is authoritative in skill §X"). **A skill does not know a leaf's body** — all it may see is the metadata delivery requires (the directory position, the file name, `paths:`), and never a summary, an excerpt, or a section number from the body. Knowing a rule's content is the job of **the agent that receives the leaf**, not of the one delivering it |
 
-**orchestrator 変種の例外:** 台本だけ薄い別入口（例: `skills/develop-light`、`skills/attack`）は、agents / rules を親キー（`develop`）と共用してよく、フル3木を新設しない。craft・規約の二重化を避ける。
+**The orchestrator-variant exception:** a thin, separate entrance that is only a script (`skills/develop-light`, `skills/attack`) may share agents and rules with the parent key (`develop`) rather than growing a full set of three trees. This avoids duplicating craft and rules.
 
 ---
 
-## 2. 何をどこに置くか（迷い用の早見）
+## 2. What goes where (a quick reference for when you are unsure)
 
-| 置きたいもの | 置き場所 | ロード契機 |
+| What you want to place | Where it goes | When it loads |
 | --- | --- | --- |
-| 規約・書式・型（関心ごと 1 葉） | `rules/<key>/.../<leaf>.md` | 葉の `paths:` にマッチしたファイルを触った時 |
-| 手続きの入口・orchestrator 台本 | `skills/<name>/SKILL.md` | `/name` または `description` 自動起動 |
-| 専門サブエージェントの人格・craft（書き方の判断規則） | `agents/<key>/<name>.md` | orchestrator が Task 起動した時だけ |
-| docs 成果物の雛形（書式の SSOT。spec-lint が必須項目を導出） | `templates/<key>/<name>.(md\|yaml)` | producer が雛形として Read した時 |
-| 実行アセット（lint・射影スクリプト） | `tools/<name>/` | producer / init が直接叩く時 |
-| 導入・更新・Cursor 射影 | ルートの `init.sh` | 人間が明示実行 |
+| A rule, a format, a type (one concern per leaf) | `rules/<key>/.../<leaf>.md` | when a file matching the leaf's `paths:` is touched |
+| A procedure's entrance, the orchestrator script | `skills/<name>/SKILL.md` | on `/name`, or auto-invocation via `description` |
+| A specialist subagent's persona and craft (the judgment rules for how to write) | `agents/<key>/<name>.md` | only when the orchestrator launches it as a Task |
+| The scaffold for a docs artifact (the format's SSOT; spec-lint derives required items from it) | `templates/<key>/<name>.(md\|yaml)` | when a producer Reads it as a scaffold |
+| An executable asset (lint, projection scripts) | `tools/<name>/` | when a producer / init invokes it directly |
+| Installation, updating, the Cursor projection | `init.sh` at the root | when a human runs it explicitly |
 
-**skill の階層制約:** Claude Code は `skills/<name>/SKILL.md` の 1 階層しか探索しない。ネストさせない。
+**The skill hierarchy constraint:** Claude Code only explores the single level `skills/<name>/SKILL.md`. Never nest them.
 
 ---
 
-## 3. 拡張チェックリスト
+## 3. Extension checklist
 
-### 3.1 葉（rules）を足す
+### 3.1 Adding a leaf (rules)
 
-1. 階層を決める: `rules/<scene>/<platform>/<framework>/<concern>.md`（例: `develop/web/crow/common/coding.md`）。framework の中でレイヤ（`common` / `frontend` / `backend`）に分かれるなら、その 1 段を挟んでよい（深いほど具体的）。**レイヤ側の葉は共通側への差分だけを持ち、共通ルールを写さない。**
-   platform／framework 層を持つ scene（`develop` 等）では、**全 platform・全 framework に等しく効く関心事に限り scene 直下（`rules/<scene>/<concern>.md`）に置いてよい**（例: コード内コメントの規約）。platform 層を持たない scene（`translate-manga-ko-ja` 等）は直下がそのまま葉の住所である。この位置の葉は develop skill §6-A が framework 判定と無関係に必ず列挙するので、**`paths:` の被覆が落ちるとその葉だけ配送されなくなる**——framework を足したら被覆も更新する。それ以外を直下に置かない。
+1. Decide the level: `rules/<scene>/<platform>/<framework>/<concern>.md` (e.g. `develop/web/crow/common/coding.md`). If a framework splits into layers (`common` / `frontend` / `backend`), you may interpose that one level (deeper is more specific). **A layer-side leaf holds only its delta on the common side and never transcribes the common rules.**
+   In a scene with platform/framework levels (`develop`, and so on), **only a concern that binds every platform and every framework equally may go directly under the scene (`rules/<scene>/<concern>.md`)** (in-code comment rules, for example). A scene with no platform level (`translate-manga-ko-ja`, and so on) has its leaves directly there. A leaf at this position is enumerated unconditionally by develop skill §6-A, regardless of framework detection, so **a gap in `paths:` coverage means that leaf alone stops being delivered** — update the coverage when you add a framework. Nothing else goes directly under the scene.
 
-**ファイル名は人間向けの目印にすぎない。配送先を決めるのは `paths:` である。**
-何をどう分割し何と名付けるかは rules 側の自由で、develop skill はファイル名の意味を知らない（§1 一方通行）。
-慣例として `coding.md`（プロダクションコードの記法）／`testing.md`（テストの書き方）／`db.md`（DB 設計）を使うが、
-**この名前に配送上の効力は無い。**
-2. **frontmatter の `paths:` が配送契約である。** ここに書いた glob にマッチするファイルを**書く** producer だけが、その葉を受け取る（develop skill §6-B）。したがって:
-   - **その葉を読ませたい相手が「書く」住所を、過不足なく `paths:` に列挙する。**
-     テストの書き方なら**テストファイル**の glob、DB 設計なら**DB 設計 SSOT** の glob、プロダクションコードの記法ならその**コードの住所**。
-   - **その葉が実際に効く住所まで絞る。** framework 全体を指す広い glob（`**/<fw>_*/**`）を書いてよいのは、**全住所に効く葉だけ**（共通スタイル・レイヤの核）。
-     住所固有の葉を広い glob のままにすると、無関係なファイルを触っただけで全葉がロードされ、分割した意味が消える。
-   - **逆に絞りすぎると配送されない。** 「テスト規約なのに `paths:` がプロダクションコードだけ」なら test-designer に届かない。
-     `paths:` は Claude Code の自動ロード契機であると同時に、**誰に渡すかの宣言**でもある。
-3. **1 葉 = 1 関心事**（coding / testing / db …）。overview は入口リンクだけ。
-4. レイヤの葉が複数に割れたら、**そのレイヤの `coding.md` を「核＋住所→葉の索引」にする**
-   （境界・不変則だけを持ち、住所固有の話は各葉へ）。**索引は葉の側の持ち物**である——
-   skill は葉の本文を読まないので（§1 一方通行）、配送の絞り込みは各葉の `paths:` だけで決まるように書く。
-5. **他レイヤへ実装を委任する関係は、委任先の葉の `paths:` に当該住所を含めて宣言する。**
-   本文に「○○は他レイヤの `coding.md` を見よ」と書くだけでは配送に効かない（skill は本文を読まない）。
-6. 目次への追記は不要（存在しない）。
+**A file name is nothing but a signpost for humans. What decides the destination is `paths:`.**
+How things are split and what they are named is the rules side's freedom, and the develop skill does not know what a file name means (§1, one-way references).
+By convention `coding.md` (the notation for production code) / `testing.md` (how to write tests) / `db.md` (DB design) are used, but
+**those names have no delivery effect.**
+2. **The `paths:` frontmatter is the delivery contract.** Only a producer that **writes** a file matching a glob listed there receives that leaf (develop skill §6-B). Therefore:
+   - **Enumerate in `paths:`, exactly and completely, the addresses the intended recipient "writes".**
+     For testing rules, the glob of **test files**; for DB design, the glob of the **DB design SSOT**; for the notation of production code, **that code's addresses**.
+   - **Narrow it down to the addresses where the leaf actually binds.** A wide glob covering a whole framework (`**/<fw>_*/**`) may be written only for **a leaf that binds every address** (the common style, a layer's core).
+     Leaving an address-specific leaf on a wide glob means every leaf loads the moment an unrelated file is touched, and the point of splitting is gone.
+   - **Conversely, over-narrowing means it is never delivered.** "Testing rules whose `paths:` covers only production code" never reach test-designer.
+     `paths:` is both Claude Code's automatic load trigger and **a declaration of who receives it**.
+3. **One leaf = one concern** (coding / testing / db …). An overview holds nothing but entrance links.
+4. When a layer's leaves have split into several, **make that layer's `coding.md` "the core + an index from address to leaf"**
+   (holding only the boundaries and invariants, with address-specific matters in each leaf). **The index belongs to the leaves** —
+   the skill does not read a leaf's body (§1, one-way references), so write it so that narrowing delivery is decided by each leaf's `paths:` alone.
+5. **A delegation of implementation to another layer is declared by including that address in the delegate leaf's `paths:`.**
+   Writing "for X, see the other layer's `coding.md`" in the body has no delivery effect (the skill does not read the body).
+6. No addition to a table of contents is needed (there is none).
 
 ```yaml
-#	全住所に効く葉（共通スタイル・レイヤの核）
+#	a leaf that binds every address (the common style, a layer's core)
 ---
 paths:
   - "**/crow3_*/**"
 ---
 
-#	住所固有の葉（例: Domain 側だけ・SQL だけ）
+#	an address-specific leaf (e.g. the Domain side only, or SQL only)
 ---
 paths:
   - "**/crow3_*/app/classes/**"
 ---
 ```
 
-### 3.2 手続き（skill + agents + rules）を足す
+### 3.2 Adding a procedure (skill + agents + rules)
 
-1. キー名 `<key>` を決め、**3木を同名で生やす**。
-2. `skills/<key>/SKILL.md` … orchestrator の不変則・フロー・委譲先だけ。
-3. `agents/<key>/*.md` … producer / oracle を分離。書式リファレンスは生成する agent body に内包。
-4. `rules/<key>/**` … paths ゲートで遅延ロードする型。
-5. skill 本文から agent パスを相対で指す（絶対パスや他プロジェクト前提を書かない）。
+1. Decide the key name `<key>` and **grow three trees under the same name**.
+2. `skills/<key>/SKILL.md` … only the orchestrator's invariants, flow, and delegation targets.
+3. `agents/<key>/*.md` … producer and oracle separated. The format reference is embedded in the agent body being generated.
+4. `rules/<key>/**` … the types, lazily loaded through the paths gate.
+5. Point at agent paths relatively from the skill body (never write an absolute path or presume another project).
 
-**orchestrator 変種だけ足す場合**（例: `develop-light`）: 新しい agents / rules ツリーは作らず、親キーの agents を Task から参照する薄い `skills/<variant>/SKILL.md` だけを足す。親 skill へ交差参照を置き、ゲート免除の逃げ道にしない。
+**When adding only an orchestrator variant** (`develop-light`, for example): do not create new agents / rules trees. Add only a thin `skills/<variant>/SKILL.md` that references the parent key's agents from its Tasks. Put a cross-reference in the parent skill, and never let it become an escape hatch from a gate.
 
-### 3.3 agent frontmatter の型
+### 3.3 The agent frontmatter type
 
 ```yaml
 ---
-name: <unique-name>          # Cursor 射影時の識別子にもなる
-description: <起動条件が分かる一文>
-tools: Read, Write, ...      # 必要最小。oracle は read-only に寄せる
-model: opus | inherit        # Claude Code 向けの既定ヒント。下記の割り当て規則に従う。Cursor 射影では inherit に正規化され、起動時選択が正
+name: <unique-name>          # also the identifier in the Cursor projection
+description: <one sentence that makes the launch condition clear>
+tools: Read, Write, ...      # the minimum needed. Lean read-only for oracles
+model: opus | inherit        # the default hint for Claude Code. Follow the assignment rule below.
+                             # Normalized to inherit in the Cursor projection, where the choice at launch is authoritative
 ---
 ```
 
-- producer: 入力契約 → craft → 出力契約。自己承認（`fixed` 化）しない。
-- oracle / attacker / judge / reviewer: **不整合・欠陥の摘発**が任務。一致確認で満足しない。原則修正しない。
+- Producer: input contract → craft → output contract. Never self-approves (never marks something `fixed`).
+- Oracle / attacker / judge / reviewer: their mission is **exposing inconsistencies and defects**. Never settle for confirming agreement. As a rule, they fix nothing.
 
-**`model:` の割り当て規則（機械オラクルの有無で切る）**
+**The `model:` assignment rule (cut by whether a machine oracle exists)**
 
-| ゾーン | 該当 | Claude Code `model:` | Cursor（Task 起動時） | 理由 |
+| Zone | Who | Claude Code `model:` | Cursor (at Task launch) | Why |
 | --- | --- | --- | --- | --- |
-| 判断ゾーン（機械で反証できない） | ssot-definer / db-designer / contract-author / test-designer / adr-writer / slice-reviewer、および全 oracle・attacker・judge | `opus` | orchestrator がタスクに合わせて上位モデルを選ぶ | 下流全部の拠り所になる成果物。ここの劣化は「正しく間違った実装」を生む |
-| 決定論ゾーン（機械オラクルがある） | 実装 producer 3体 / skeleton-runner / committer | `inherit` | 軽量寄りまたは `inherit` でよい | テスト・ビルドが合否を決めるのでモデル差が最終品質に出にくい |
+| The judgment zone (machines cannot refute it) | ssot-definer / db-designer / contract-author / test-designer / adr-writer / slice-reviewer, and every oracle, attacker, and judge | `opus` | the orchestrator picks a top-tier model to match the task | Everything downstream rests on these artifacts. Degradation here produces "correctly wrong" implementations |
+| The deterministic zone (a machine oracle exists) | the 3 implementation producers / skeleton-runner / committer | `inherit` | lighter, or `inherit`, is fine | Tests and builds decide pass/fail, so the model makes little difference to final quality |
 
-> **特定の model slug（`sonnet` や Cursor 固有名）を harness にベタ書きしない。** 共有 harness が取り込み先の予算・モデルカタログまで縛ってしまうため（§0）。Cursor では射影が `inherit` になるので、**orchestrator が Task 起動のたびゾーンとタスク性質に応じて選ぶ**（台本の正は develop skill §5）。Claude Code では agent frontmatter の `opus`／`inherit` が既定として効く。
+> **Never hardcode a specific model slug (`sonnet`, or a Cursor-specific name) into the harness.** The shared harness would then constrain the host's budget and model catalog (§0). In Cursor the projection becomes `inherit`, so **the orchestrator picks per Task launch, by zone and by the task's nature** (the script is authoritative in develop skill §5). In Claude Code, the agent frontmatter's `opus` / `inherit` acts as the default.
 
 ---
 
-## 4. 改修時の作業フロー（この repo での開発）
+## 4. The working flow for a modification (development in this repo)
 
-1. **変更対象の SSOT を特定する**（rules 葉 / skill / agent body / tools / `init.sh` / `README.md`）。
-2. **二重化が起きないか確認する**（同じ書式が skill と agent と rules に散らばっていないか）。
-3. 変更後、関連 README 節・コメント・他 agent からの参照パスが切れないか目視する。
-4. Cursor 併用を触った／rules・skills・agents を変えたら、取り込み先または検証用に射影を再生成:
+1. **Identify the SSOT for what you are changing** (a rules leaf / a skill / an agent body / tools / `init.sh` / `README.md`).
+2. **Check no duplication arises** (is the same format scattered across a skill, an agent, and rules?).
+3. After the change, visually confirm the related README sections, comments, and reference paths from other agents are not broken.
+4. If you touched the Cursor integration, or changed rules / skills / agents, regenerate the projection for the host or for verification:
    ```bash
    ./init.sh cursor .
-   # または
+   # or
    .claude/tools/cursor-sync/sync.sh .claude .cursor
    ```
-5. submodule 利用者向けに壊さない変更なら、必要に応じて **`v*` リリースタグ**を切る（`init.sh update` がタグ単位で追従するため）。
+5. For a change that does not break submodule users, cut a **`v*` release tag** where appropriate (`init.sh update` follows tags).
 
 ---
 
-## 5. 検証の当たり所
+## 5. Where to aim verification
 
-| 変更内容 | 最低限の確認 |
+| What changed | The minimum check |
 | --- | --- |
-| rules 葉 | `paths:` の有無・glob の妥当性・1 関心事か |
-| skill | description が起動トリガーになるか／orchestrator が自分でコードを書かない指示があるか |
-| agent | producer≠oracle 分離／入力・出力契約が明示されているか／`model:` が §3.3 の割り当て規則どおりか（`sonnet` ベタ書きが無いか） |
-| cursor-sync | `paths`→`globs`・`alwaysApply: false`・`model: inherit`・GENERATED マーカ |
-| templates | 1 成果物 1 テンプレート／プレースホルダが `F-000`・`YYYY-MM-DD`・`<...>` に統一されているか／spec-lint の導出（必須セクション・必須 `x-` キー）が壊れないか |
-| spec-lint | `.claude/tools/spec-lint/README.md` の使い方に沿い、producer が直接叩けること。書式はテンプレートから導出し、lint 側に再記述しない |
-| gate-hook | 常設にしない（設置は取り込み先の settings.local.json・任意有効化）／docs・`.claude` 配下を塞がない／ブロック理由が develop skill §2 の戻り先を示すこと |
-| init.sh | install / update / cursor のヘルプと README の記述が一致しているか |
+| A rules leaf | Is `paths:` present? Is the glob valid? Is it one concern? |
+| A skill | Does the description work as a launch trigger? Does it instruct the orchestrator not to write code itself? |
+| An agent | Is producer ≠ oracle separated? Are the input and output contracts explicit? Does `model:` follow the §3.3 assignment rule (no hardcoded `sonnet`)? |
+| cursor-sync | `paths`→`globs`, `alwaysApply: false`, `model: inherit`, the GENERATED marker |
+| templates | One artifact, one template? Are the placeholders unified as `F-000` / `YYYY-MM-DD` / `<...>`? Is spec-lint's derivation (required sections, required `x-` keys) unbroken? |
+| spec-lint | Does it follow `.claude/tools/spec-lint/README.md`'s usage, and can a producer invoke it directly? The format is derived from the templates and never restated on the lint side |
+| gate-hook | Never made permanent (installation is the host's `settings.local.json`, optional). Does it leave docs and `.claude` unblocked? Does the block reason point at develop skill §2's return point? |
+| init.sh | Do the help for install / update / cursor and the README agree? |
 
-アプリの業務テストはこのリポジトリの主対象ではない。**配線の一貫性・常駐ゼロ・3木の整合**が品質の軸である。
+Application-level business tests are not this repository's primary target. **Consistency of the wiring, zero residency, and the alignment of the three trees** are the axes of quality.
 
 ---
 
-## 6. 読む順（迷ったとき）
+## 6. Reading order (when unsure)
 
-1. 本ファイル（作業指針）
-2. [`README.md`](./README.md)（思想・地図・導入）
-3. 触る対象だけを開く:
-   - 手続きを変える → 該当 `skills/<key>/SKILL.md`
-   - craft/書式を変える → 該当 `agents/<key>/*.md`
-   - framework 規約を変える → 該当 `rules/.../*.md`
-   - 射影を変える → `.claude/tools/cursor-sync/sync.sh`
-   - 導入を変える → `init.sh`
+1. This file (the working guidance)
+2. [`README.md`](./README.md) (the philosophy, the map, the setup)
+3. Open only what you are touching:
+   - Changing a procedure → the relevant `skills/<key>/SKILL.md`
+   - Changing craft or a format → the relevant `agents/<key>/*.md`
+   - Changing a framework's rules → the relevant `rules/.../*.md`
+   - Changing the projection → `.claude/tools/cursor-sync/sync.sh`
+   - Changing installation → `init.sh`
