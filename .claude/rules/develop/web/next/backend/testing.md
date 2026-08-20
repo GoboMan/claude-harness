@@ -7,33 +7,35 @@ paths:
   - "**/jest.config.*"
 ---
 
-# 🧪 Next.js / backend — テスト設計
+# 🧪 Next.js / backend — test design
 
-> **適用範囲: Next.js（App Router）のサーバ側処理。** Next.js でなければ本書は適用外として読み捨てること。
+> **Scope: server-side processing on Next.js (App Router).** If it is not Next.js, treat this document as inapplicable and discard it.
 >
-> **共通則は [common/testing.md](../common/testing.md)**（ランナーはプロジェクト宣言・コマンド一発・
-> 決定性・スイート分離・`F-xxx`）。本書は**それに従ったうえで**、
-> 役割ごとに何をどう試すかだけを扱う。共通側の再掲はしない。
+> **The common rules are [common/testing.md](../common/testing.md)** (the runner is declared by the project; one command to run;
+> determinism; suite separation; `F-xxx`). This document covers, **on top of following those**,
+> only what to try and how, per role. It never restates the common side.
 >
-> 責務分離は [backend/coding.md](./coding.md)。
-> **読み取り配線（RSC page）の FE 側試験は当面起票しない**（frontend の testing 葉は置かない）。
+> Separation of responsibilities is [backend/coding.md](./coding.md).
+> **FE-side tests for the read wiring (an RSC page) are not filed for now** (no frontend testing leaf is placed).
+>
+> **Write test names and comments in Japanese.**
 
 ---
 
-## 1. 役割ごとの主戦場
+## 1. The main arena per role
 
-| 役割 | 既定スイートでの扱い |
+| Role | How it is handled in the default suite |
 | --- | --- |
-| **ドメイン** | **最優先。** 副作用なし・モック不要の単体 |
-| **ユースケース** | **書く。** インフラは境界モックまたは偽実装。**シナリオ結果**（`ok` / `reason` 等）を検証 |
-| **インフラ** | 既定では実 DB／実外部 API を要求しない。書くなら結合スイート |
-| **ミューテーション・コントローラー**（Actions / Route Handlers） | **薄く書く。** 縁のスキーマ検証失敗、シナリオ結果→呼び手向け形の写像、ユースケース呼び出し。Actions＝Result、RH＝status＋body（[backend/coding.md](./coding.md) §6）。`revalidatePath` 等はモック |
+| **Domain** | **Highest priority.** Unit tests with no side effects and no mocks needed |
+| **Use case** | **Write them.** Infrastructure gets a boundary mock or a fake implementation. Verify the **scenario result** (`ok` / `reason`, and so on) |
+| **Infrastructure** | By default, never require a real DB or a real external API. If you write them, they go in the integration suite |
+| **Mutation controllers** (Actions / Route Handlers) | **Write them thin.** Schema-validation failure at the edge, the mapping from scenario result to the caller-facing shape, and the use-case invocation. Actions = Result, RH = status + body ([backend/coding.md](./coding.md) §6). Mock `revalidatePath` and the like |
 
-オニオンの内側ほど反証しやすく安い。**ファットな Server Actions にテストを寄せない。**
+The further inside the onion, the easier and cheaper it is to refute. **Never gather the tests onto a fat Server Action.**
 
 ---
 
-## 2. ドメイン
+## 2. The domain
 
 ```ts
 describe("F-001 rename policy", () => {
@@ -43,44 +45,44 @@ describe("F-001 rename policy", () => {
 });
 ```
 
-- `next/*`・DB・時計に触れない
-- 失敗・空・権限・境界をハッピーパスだけで終わらせない
+- Never touch `next/*`, the DB, or the clock
+- Never finish on the happy path alone — cover failure, empty, permission, and boundary
 
 ---
 
-## 3. ユースケース
+## 3. Use cases
 
-- インフラ依存は引数注入できる形を前提にする
-- モックするのは **インフラ境界だけ**（ドメインまでモックし尽くさない）
-- 返すのはシナリオ結果。呼び手向け形への写像はミューテーション・コントローラー試験で見る
+- Presume infrastructure dependencies are in a shape that can be injected as arguments
+- Mock **only the infrastructure boundary** (never mock all the way down through the domain)
+- What it returns is the scenario result. The mapping into the caller-facing shape is examined in the mutation-controller tests
 
 ---
 
-## 4. ミューテーション・コントローラー（Server Actions / Route Handlers）
+## 4. Mutation controllers (Server Actions / Route Handlers)
 
-共通: **不正入力**でユースケースが呼ばれず失敗が判別できること。**正当入力**でユースケースが期待引数で呼ばれ、シナリオ結果が呼び手向け形に載ること。
+Common to both: on **invalid input**, the use case is not called and the failure is distinguishable. On **valid input**, the use case is called with the expected arguments and the scenario result lands in the caller-facing shape.
 
-| 実装形 | 見るもの |
+| Implementation form | What to look at |
 | --- | --- |
-| Server Actions | 呼び手向け Result の成功／失敗 |
-| Route Handlers | HTTP status ＋ body（契約どおりか） |
+| Server Actions | success / failure of the caller-facing Result |
+| Route Handlers | the HTTP status + body (does it match the contract?) |
 
-Next 固有 API はモックし、キャッシュキー網羅までは求めない。
-
----
-
-## 5. インフラと結合スイート
-
-- 実 DB 試験は結合スイートへ置き、既定スイートから外す
-- 既定ではメモリ偽実装やモックで境界の入出力だけに留める
+Mock the Next-specific APIs; sweeping cache keys is not required.
 
 ---
 
-## ✅ 返す前チェックリスト
+## 5. Infrastructure and the integration suite
 
-- [ ] ドメインの純粋試験が主戦場か
-- [ ] ユースケースでインフラだけを境界モックしているか
-- [ ] ミューテーション・コントローラー試験が縁と成功／失敗判別に閉じているか（Actions＝Result、RH＝status＋body）
-- [ ] 読み取り配線の試験を backend 必須にしていないか（frontend 側）
-- [ ] 実 DB が結合フォルダに分かれ既定から外れているか
-- [ ] 最外グループに `F-xxx` が付いているか
+- Put real-DB tests in the integration suite and keep them out of the default suite
+- By default, stay on in-memory fakes or mocks and cover only the boundary's inputs and outputs
+
+---
+
+## ✅ Checklist before returning
+
+- [ ] Is the pure domain test the main arena?
+- [ ] In use-case tests, are you boundary-mocking infrastructure only?
+- [ ] Do mutation-controller tests stay closed on the edge and on distinguishing success from failure? (Actions = Result, RH = status + body)
+- [ ] Have you made read-wiring tests mandatory for the backend? (they are the frontend's)
+- [ ] Are real-DB tests split into the integration folder and excluded from the default?
+- [ ] Does the outermost group carry `F-xxx`?

@@ -24,37 +24,39 @@ paths:
   - "**/usecases/**"
 ---
 
-# 📐 Next.js — コーディングの共通則（全レイヤ）
+# 📐 Next.js — common coding rules (all layers)
 
-> **適用範囲: Next.js（App Router）の TypeScript プロジェクト。**
-> 取り込み先の `CLAUDE.md` で platform／framework を `web/next` と宣言していることを前提とする。
-> 本書の `paths` は Next らしい手がかり（`next.config.*`・`app/**/page.tsx` 等）による弱いゲートである。
-> **対象が Next.js（App Router）でなければ本書は適用外**として読み捨てること。
+> **Scope: TypeScript projects on Next.js (App Router).**
+> It presumes the host `CLAUDE.md` declares the platform/framework as `web/next`.
+> This document's `paths` are a weak gate based on Next-like signals (`next.config.*`, `app/**/page.tsx`, and so on).
+> **If the target is not Next.js (App Router), treat this document as inapplicable** and discard it.
 >
-> 本書が持つのは**レイヤをまたいで真であること**だけ。サーバ側の責務分離は
-> [backend/coding.md](../backend/coding.md)、RSC／Client の表面は
-> [frontend/coding.md](../frontend/coding.md)、テストの配線は [testing.md](./testing.md)。
-> そちらは**本書への差分**である。**共通則をレイヤ側へ写さないこと**（SSOT はここ 1 箇所）。
+> What this document holds is only **what is true across layers**. Server-side separation of responsibilities is
+> [backend/coding.md](../backend/coding.md); the RSC / Client surface is
+> [frontend/coding.md](../frontend/coding.md); test wiring is [testing.md](./testing.md).
+> Those are **deltas on this document**. **Never copy the common rules into a layer leaf** (the SSOT is here, in one place).
+>
+> **Write comments and user-facing text in Japanese.**
 
 ---
 
-## 0. 整形は本書ではなくツールが決める
+## 0. Formatting is decided by tools, not by this document
 
-インデント・改行位置・クォート・セミコロン・import 順は **プロジェクトの lint / format コマンドが SSOT** であり、
-本書は一切定めない。手で桁を揃えない。**書き終えたら整形コマンドを通してから返す。**
+Indentation, line breaks, quotes, semicolons, and import order are **authoritative in the project's lint / format command**,
+and this document defines none of them. Never align columns by hand. **Run the format command before returning.**
 
-規約が競合したときはツールの出力が正である（人間もそこしか見ない）。
+When a rule conflicts, the tool's output wins (that is all a human looks at too).
 
 ---
 
-## 1. 型を弱めて緑にしない
+## 1. Never weaken types to get to green
 
-**`any` / `as any` / non-null assertion（`!`） / `@ts-expect-error` / `eslint-disable` を「型エラーを消すため」に書かない。**
-不明な値は `unknown` とし、狭めてから使う。
+**Never write `any` / `as any` / a non-null assertion (`!`) / `@ts-expect-error` / `eslint-disable` "to make a type error go away".**
+Treat an unknown value as `unknown` and narrow it before use.
 
-特に **Server Actions・Route Handlers・`searchParams` / `params` など、外から入る値**を
-`as` で業務型に張り付けない。縁での実行時検証（[backend/coding.md](../backend/coding.md)）を経ていない値を
-型だけ信じるのは、実行時に別の場所で落ちる欠陥になる。
+In particular, **never paste a business type onto values arriving from outside** — Server Actions, Route Handlers,
+`searchParams` / `params` — with `as`. Trusting the type of a value that has not been through runtime validation at the edge
+([backend/coding.md](../backend/coding.md)) is a defect that lands somewhere else at runtime.
 
 ```ts
 //  NG: 外から来た値を型で押し潰している
@@ -64,19 +66,19 @@ const input = raw as CreateUserInput;
 const id = params.id!;
 ```
 
-**抑止したくなったら、実装を止めて「何と何が食い違っているか」を報告する**（各実装体の出力契約のとおり）。
-自分で契約を書き換えて辻褄を合わせない。
+**When you want to suppress something, stop implementing and report "what conflicts with what"** (per each implementer's output contract).
+Never rewrite the contract yourself to make things line up.
 
-例外は**外部ライブラリの型定義が実際の挙動と異なる場合だけ**で、そのときは理由をコメントに残す。
+The only exception is **when an external library's type definitions differ from its actual behavior**, and then leave the reason in a comment.
 
 ---
 
-## 2. モジュールの形
+## 2. The shape of a module
 
-### default export を使わない
+### Do not use default exports
 
-import 側で名前を自由に付けられてしまい、同じものが呼び出し箇所ごとに違う名前になる。
-**名前付き export に統一する。**
+The importing side is free to name it anything, so the same thing ends up with a different name at every call site.
+**Standardize on named exports.**
 
 ```ts
 //  NG
@@ -86,56 +88,56 @@ export default function UserCard() {}
 export function UserCard() {}
 ```
 
-> **唯一の例外: App Router がファイル規約で要求する default export。**
-> 少なくとも `page.tsx` / `layout.tsx` / `route.ts(x)` / `loading.tsx` / `error.tsx` /
-> `not-found.tsx` / `template.tsx` / `default.tsx` は framework が default export で解決する。
-> 名前付き export にすると**ルートや特殊 UI が空になる**（ビルドは通ることがある）。
+> **The one exception: the default exports the App Router requires by file convention.**
+> At minimum `page.tsx` / `layout.tsx` / `route.ts(x)` / `loading.tsx` / `error.tsx` /
+> `not-found.tsx` / `template.tsx` / `default.tsx` are resolved by the framework through a default export.
+> A named export there **leaves the route or the special UI empty** (the build may still pass).
 
-### barrel を作らない
+### Do not create barrels
 
-再 export しかしない `index.ts` を置かない。循環 import の温床であり、バンドラから見て不要な結線が増える。
+Never place an `index.ts` that only re-exports. It is a breeding ground for circular imports and adds wiring the bundler does not need.
 
-`app/` 配下では、置き場所とファイル名自体がルーティング仕様になる。
-barrel のつもりで置いたファイルが、意図しないルートや特殊ファイルとして解決されないか注意する。
+Under `app/`, the placement and the file name themselves are the routing spec.
+Watch that a file you meant as a barrel does not get resolved as an unintended route or special file.
 
-### 相対パスを積み上げない
+### Do not stack relative paths
 
-`../../../` を書かず、tsconfig のパスエイリアス（多くの Next プロジェクトでは `@/`）を使う。
-ファイルを移動した瞬間に全リンクが切れるのを防ぐ。
-
----
-
-## 3. 環境変数と秘密
-
-**`NEXT_PUBLIC_` を接頭辞に持つ環境変数は、クライアントバンドルへ埋め込まれる。すなわち公開される。**
-
-- API の公開ベース URL・公開キー・機能フラグ → 置いてよい
-- API シークレット・署名鍵・DB URL・管理者トークン → **`NEXT_PUBLIC_` を付けない。サーバ側だけの環境変数に置く**
-
-秘密を要する処理が Client Component 側に必要になったら、それはクライアントに置けない処理である。
-**実装を止めて報告する**（自分でサーバ側の設計を決めない）。
+Never write `../../../`; use tsconfig's path alias (`@/` in most Next projects).
+This prevents every link breaking the moment a file moves.
 
 ---
 
-## 4. `middleware` に業務を沈めるな
+## 3. Environment variables and secrets
 
-`middleware.ts` はリクエストの薄い縁（リダイレクト・ヘッダ・認証クッキーの有無チェック等）に限る。
-**ドメイン判定・DB アクセス・ユースケース呼び出しを置かない。**
+**An environment variable prefixed `NEXT_PUBLIC_` is embedded into the client bundle — that is, published.**
 
-本体の置き場（所有者は [backend/coding.md](../backend/coding.md) §1.1）:
+- A public API base URL, a public key, a feature flag → fine to put there
+- An API secret, a signing key, a DB URL, an admin token → **never prefix them `NEXT_PUBLIC_`. Put them in server-only environment variables**
 
-- **ミューテーション**（Actions / Route Handlers）→ backend-logic
-- **読み取り配線**（`page` / `layout`）→ frontend-logic
-- **`middleware.ts` 自体**（薄い縁のみ）→ backend-logic（別にするなら `CLAUDE.md` に宣言）
-- どれもユースケース経由で業務を完結させない。定義は [backend/coding.md](../backend/coding.md) §1
+If processing that requires a secret becomes necessary on the Client Component side, that processing cannot live on the client.
+**Stop implementing and report** (never decide the server-side design yourself).
 
 ---
 
-## ✅ 返す前チェックリスト
+## 4. Never sink business into `middleware`
 
-- [ ] lint / format コマンドを通したか
-- [ ] `any` / `as any` / `!` / `@ts-expect-error` / `eslint-disable` を緑化のために足していないか
-- [ ] App Router が要求するファイル以外で `export default` を使っていないか
-- [ ] 再 export だけの `index.ts` を置いていないか
-- [ ] 秘密になりうる値を `NEXT_PUBLIC_` に入れてないか
-- [ ] `middleware` に業務ロジックや DB アクセスを書いていないか
+`middleware.ts` is limited to a thin request edge (redirects, headers, checking for the presence of an auth cookie, and so on).
+**Never put domain decisions, DB access, or use-case invocation there.**
+
+Where the substance goes (owned by [backend/coding.md](../backend/coding.md) §1.1):
+
+- **Mutations** (Actions / Route Handlers) → backend-logic
+- **Read wiring** (`page` / `layout`) → frontend-logic
+- **`middleware.ts` itself** (the thin edge only) → backend-logic (declare it in `CLAUDE.md` if you split it out)
+- None of them completes business without going through a use case. The definitions are in [backend/coding.md](../backend/coding.md) §1
+
+---
+
+## ✅ Checklist before returning
+
+- [ ] Did you run the lint / format command?
+- [ ] Did you add `any` / `as any` / `!` / `@ts-expect-error` / `eslint-disable` to get to green?
+- [ ] Are you using `export default` anywhere other than the files the App Router requires?
+- [ ] Did you place an `index.ts` that only re-exports?
+- [ ] Did you put a value that could be a secret into `NEXT_PUBLIC_`?
+- [ ] Did you write business logic or DB access into `middleware`?

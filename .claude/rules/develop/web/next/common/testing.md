@@ -10,97 +10,99 @@ paths:
   - "**/playwright.config.*"
 ---
 
-# 🧪 Next.js — テストの共通則（全レイヤ）
+# 🧪 Next.js — common testing rules (all layers)
 
-> **適用範囲: Next.js（App Router）の TypeScript プロジェクト。** Next.js でなければ本書は適用外として読み捨てること。
+> **Scope: TypeScript projects on Next.js (App Router).** If it is not Next.js, treat this document as inapplicable and discard it.
 >
-> **テストの原則（何を・なぜテストするか）は develop の開発プロセスが土台。**
-> 1 テスト = 1 振る舞い／失敗・空・権限・境界を条件に含める／モックは境界だけ／
-> 決定的にする／カバレッジは目標でなく信号——これらは全開発共通なのでここには再掲せず、そこに従う。
+> **The principles of testing (what to test and why) rest on develop's development process.**
+> One test = one behavior; include failure, empty, permission, and boundary in the conditions; mock only at the boundary;
+> make it deterministic; coverage is a signal, not a target — these are common to all development, so they are not restated here; follow them there.
 >
-> 本書は **Next.js でその原則を成立させるための配線**だけを持つ。
-> レイヤ固有の書き方は [backend/testing.md](../backend/testing.md)。
-> **frontend のテスト書き方葉は当面置かない**（develop は FE テストを起票しない）。
-> 記法は [common/coding.md](./coding.md)。
+> This document holds only **the wiring that makes those principles hold in Next.js**.
+> Layer-specific style is in [backend/testing.md](../backend/testing.md).
+> **No frontend testing leaf is placed for now** (develop does not file FE tests).
+> Notation is [common/coding.md](./coding.md).
+>
+> **Write test names and comments in Japanese.**
 
 ---
 
-## 1. ランナーはプロジェクトが宣言する
+## 1. The runner is declared by the project
 
-**特定のテストランナーや UI テストライブラリを harness では固定しない。**
-選定・設定・**既定スイートを回すコマンド**は、取り込み先の `CLAUDE.md` に記録する。
+**The harness never pins a specific test runner or UI testing library.**
+The choice, the configuration, and **the command that runs the default suite** are recorded in the host's `CLAUDE.md`.
 
-- **コマンド 1 つで既定スイート全件が実行でき、終了コードで赤緑が判定できる**こと
-- **未導入なら、その導入が着手のゲート**である。ランナーが無いまま実装だけ進めると
-  develop の Phase4（機械オラクルで回す赤緑ループ）が成立しない
-
----
-
-## 2. スコープ実行（機能ID タグ）
-
-すべてのテストで、最外のグループ（多くのランナーでは `describe`）を
-
-`F-001 <機能名>`
-
-のようにし、機能ID（`docs/specs/` のディレクトリ名と同じキー）で機械選択できるようにする。
-
-- 指定実行の具体コマンドはランナーに合わせて `CLAUDE.md` に書く（例: 名前フィルタで `F-001`）
-- 修正ループ中は該当機能の指定実行で回し、フル実行は境界（返す直前・commit 前・CI）に寄せる
-- **新規テストにタグ漏れを作らない**（漏れるとスコープ実行から外れ、回帰検出が境界任せになる）
+- **A single command must run the whole default suite, with the exit code deciding red or green**
+- **If none is installed, installing it is the gate to starting.** Pushing implementation forward with no runner means
+  develop's Phase4 (the red-green loop driven by the machine oracle) does not hold
 
 ---
 
-## 3. 決定的にする（Next で揺れやすいもの）
+## 2. Scoped execution (the feature ID tag)
 
-実時刻・乱数・ネットワーク・実 DB に暗黙依存しない。必要なら注入してテストで固定する。
+In every test, make the outermost group (`describe` in most runners) read
 
-| 揺れの源 | 扱い |
+`F-001 <feature name>`
+
+so it can be selected mechanically by the feature ID (the same key as the directory name under `docs/specs/`).
+
+- Write the concrete selection command, matched to the runner, in `CLAUDE.md` (e.g. a name filter for `F-001`)
+- During the fix loop, run the selection for that feature; push full runs to the boundaries (before returning, before commit, in CI)
+- **Never let a new test go untagged** (untagged, it falls out of scoped execution and regression detection is left to the boundary)
+
+---
+
+## 3. Make it deterministic (what wobbles in Next)
+
+Never depend implicitly on real time, randomness, the network, or a real DB. Inject them where needed and pin them in the test.
+
+| Source of wobble | How to handle it |
 | --- | --- |
-| 実ネットワーク／実 DB | 既定スイートでは使わない。境界はモックまたは偽実装 |
-| `Date.now` / タイマー | 固定するかフェイクタイマーで進める |
-| 実時間の `sleep` | **使わない。** CI 負荷でフレークする |
-| `next/cache`・`cookies`・`headers` 等 | ミューテーション・コントローラー（Actions / RH）の試験で触るならモックする。ユースケースには入れない前提（[backend/coding.md](../backend/coding.md)） |
+| The real network / a real DB | never used in the default suite. Mock or fake the boundary |
+| `Date.now` / timers | pin them, or advance them with fake timers |
+| Real-time `sleep` | **never use it.** It flakes under CI load |
+| `next/cache`, `cookies`, `headers`, and so on | mock them if a mutation-controller (Actions / RH) test touches them. The premise is that they never enter a use case ([backend/coding.md](../backend/coding.md)) |
 
-テスト同士は**順序に依存しない。** 共有の可変グローバルを書き換えたら必ず戻す。
+Tests **never depend on order.** If you modified a shared mutable global, always restore it.
 
 ---
 
-## 4. スイートは「実行に何を要求するか」で分ける
+## 4. Split suites by what execution requires
 
-テストレベルの呼び名（単体／結合／システム）を先に決めて分類するのではなく、
-**そのテストを走らせるのに何を起動する必要があるか**で分ける。
+Rather than picking test-level names (unit / integration / system) first and classifying by them,
+split by **what has to be started for that test to run**.
 
-| スイート | 判定基準（これだけで決まる） | 住所（既定例） | 回す頻度 |
+| Suite | The criterion (this alone decides it) | Location (the default example) | How often it runs |
 | --- | --- | --- | --- |
-| **既定** | 外部環境を一切起動しない（モックは境界だけ） | 対象構成のミラー／`__tests__/` 等 | 赤緑ループで毎回 |
-| **結合** | **実 DB・実サービスに接続する** | `tests/integration/` | 境界（返す直前・commit 前・CI）のみ |
-| **システム** | **ブラウザを起動する** | `e2e/` | 工程外（opt-in） |
+| **Default** | starts no external environment (mocks only at the boundary) | mirroring the target structure, `__tests__/`, and so on | every time in the red-green loop |
+| **Integration** | **connects to a real DB or a real service** | `tests/integration/` | at a boundary only (before returning, before commit, in CI) |
+| **System** | **starts a browser** | `e2e/` | outside the phases (opt-in) |
 
-- **分離はフォルダで行う。** タグだけの分離は、設定漏れで既定スイートに混入したとき気づけない
-- **既定スイートの探索から結合・システムの住所を外す**（ランナー設定で ignore）。入れ忘れるとブラウザや実 DB が赤緑ループに紛れ込む
-- **既定スイートは、DB もブラウザも用意されていないマシンで緑になる**こと
-- 住所を別名にするプロジェクトは **`CLAUDE.md` に宣言**する。判定基準と「既定に混ぜない」は変えない
-- **システムスイートは develop の工程に無い。** 書き方は本書の対象外。定めるのは住所と混入禁止だけ
+- **Separate by folder.** Separation by tag alone cannot be noticed when a gap in configuration lets something leak into the default suite
+- **Exclude the integration and system locations from the default suite's discovery** (ignore them in the runner config). Forget it and a browser or a real DB slips into the red-green loop
+- **The default suite must go green on a machine with neither a DB nor a browser available**
+- A project that renames the locations **declares it in `CLAUDE.md`**. The criterion and "never mix into the default" do not change
+- **The system suite is not part of develop's phases.** How to write it is outside this document's scope. All it defines is the location and the ban on mixing
 
-### 契約適合テストは既定スイートに置く
+### Contract-conformance tests belong to the default suite
 
-backend の契約適合テスト（入出力・純粋関数。[backend/testing.md](../backend/testing.md)）は、
-外部環境を起動しないので**結合スイートではない**。
+The backend's contract-conformance tests (inputs/outputs, pure functions — [backend/testing.md](../backend/testing.md))
+start no external environment, so they are **not integration tests**.
 
-**ここを結合スイートへ移してはならない。** develop の Phase4 機械オラクルは当面 **BE テスト**が担う（FE テストは起票しない）。
-
----
-
-## 5. カバレッジは目標ではなく信号
-
-カバレッジ率は「どこを見ていないか」の目安であって**達成目標にしない**。
-**テスト緑は前提条件であって完成条件ではない。** 緑の後に敵対検証（`slice-reviewer`。必要なら `/attack`）で欠陥を摘発する。
+**They must never be moved into the integration suite.** develop's Phase4 machine oracle is carried, for now, by the **BE tests** (FE tests are not filed).
 
 ---
 
-## ✅ 返す前チェックリスト
+## 5. Coverage is a signal, not a target
 
-- [ ] 既定スイートを回すコマンドが `CLAUDE.md` にあり、終了コードで赤緑が分かるか
-- [ ] 最外グループに `F-xxx` が付いているか
-- [ ] 実時間 sleep・実 DB・ブラウザ起動が既定スイートに混ざっていないか
-- [ ] 結合／システムが別フォルダで、既定の探索から外れているか
+The coverage percentage is a hint about what you are not looking at — **never a target to hit**.
+**Green tests are a precondition, not the definition of done.** After green, adversarial verification (`slice-reviewer`, and `/attack` if needed) exposes the defects.
+
+---
+
+## ✅ Checklist before returning
+
+- [ ] Is the command that runs the default suite in `CLAUDE.md`, with red/green readable from the exit code?
+- [ ] Does the outermost group carry `F-xxx`?
+- [ ] Have real-time sleeps, a real DB, or a browser launch mixed into the default suite?
+- [ ] Are integration and system in separate folders, excluded from the default discovery?
