@@ -46,7 +46,8 @@ so it can be selected mechanically by the feature ID (the same key as the direct
 
 - With Swift Testing use `@Suite("F-001 …")`; with XCTest include `F-001` in the outermost class name or the name
 - Write the concrete selection command, matched to the runner, in `CLAUDE.md`
-- **Never let a new test go untagged** (when to run the selection is in [test-execution.md](./test-execution.md))
+- **When to run a selection vs the whole default suite is authoritative in develop skill §4 (test-run granularity).** This leaf defines only how to stamp and select by feature ID
+- **Never let a new test go untagged** (when to run the selection is in [test-execution.md](./test-execution.md) and develop skill §4)
 
 ---
 
@@ -99,7 +100,7 @@ split by **what has to be started for that test to run**.
 
 | Suite | The criterion (this alone decides it) | Location (the default example) | How often it runs |
 | --- | --- | --- | --- |
-| **Default** (unit) | starts neither a simulator nor a real API (mocks only at the boundary) | mirroring the target, `Tests/`, and so on | every time in the red-green loop |
+| **Default** (unit) | starts neither a simulator nor a real API (mocks only at the boundary) | mirroring the target, `Tests/`, and so on | the suite the red-green loop draws from (selection during a round; whole run at a boundary — develop skill §4) |
 | **Integration** | **connects to a real API or a real service** | `Tests/Integration/`, and so on | at a boundary only |
 | **System** | **starts a simulator or a real device** (XCUITest, snapshots, and so on) | `UITests/` / `e2e/`, and so on | outside the phases (opt-in) |
 

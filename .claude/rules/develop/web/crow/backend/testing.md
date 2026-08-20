@@ -223,7 +223,7 @@ PHPUnit's default discovery picks up `tests` recursively, so **without an `<excl
 
 | Suite | Run | When it runs |
 | --- | --- | --- |
-| Default | `phpunit --testsuite default` | every time in the red-green loop. **It must go green on a machine with no DB** |
+| Default | `phpunit --testsuite default` | the suite the red-green loop draws from (selection during a round; whole run at a boundary — develop skill §4). **It must go green on a machine with no DB** |
 | Integration | `phpunit --testsuite integration` | at a boundary only (before returning, before commit, in CI) |
 
 Directly under `tests/` (the default suite), **always mock** boundaries such as the DB handle, per "Substituting crow's boundaries" above.

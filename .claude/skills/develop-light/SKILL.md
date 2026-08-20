@@ -104,12 +104,12 @@ Only after the contract is `fixed`.
    - The FE runs **sequentially**: after the contract is `fixed`, `frontend-ui-implementer` (🙋 human eyeball; no UI Red tests are passed) → after approval, `frontend-logic-implementer` (🤖; no FE Red tests are passed)
    - 4a-1 **may run concurrently** with test-designer. BE **may run concurrently** with the FE ui step (as long as write targets do not intersect)
 3. No dedicated integration phase (same as the mainline; the machine oracle is BE, and the FE gap is covered by the human eyeball plus `slice-reviewer`).
-4. Once FE and BE implementations are both in (and if any verification was skipped for exclusivity, after a consolidated run has settled red/green), launch **`slice-reviewer`**. Iterate to zero defects (circuit breaker in §6). **No attacker is launched.**
+4. Once FE and BE implementations are both in (and if any verification was skipped for exclusivity, after a consolidated run has settled red/green of the skipped feature IDs + blast radius — mainline develop skill §4 test-run granularity), launch **`slice-reviewer`**. Iterate to zero defects (circuit breaker in §6). **No attacker is launched.**
 5. If you find yourself wanting to change the contract, stop implementation and return to Phase3. If the change breaks eligibility, escalate to the mainline.
 
 ### Verification and completion
 
-- If `slice-reviewer`'s defect list is empty, hand off to `committer`.
+- If `slice-reviewer`'s defect list is empty, **order the whole default suite once** (mainline develop skill §4 test-run granularity), then hand off to `committer`.
 - `slice-attacker` / `system-attacker` are not launched (the human runs `/attack` if needed).
 
 ## 5. Implementation start gate
@@ -131,12 +131,13 @@ Excuses like "it's a small CRUD" are rejected. If all you want is lower cost, yo
 - An SSOT change to behavior only → back to the current slice. A change that touches the frozen structure → re-run Phase1→3, or escalate to the mainline.
 - At every phase transition, the orchestrator updates the phase column in `docs/specs/specs.md` (`定義`→`構造`→`実装`→`検証`→`完了`).
 - Sorting for docs hygiene (PRD / ADR / issue / commit message) follows the mainline develop routing table.
+- **Test-run granularity follows mainline develop skill §4.** A fix round runs the reds + blast radius. The whole default suite runs once before `committer`, and in CI. Never treat a mutation as a reason to fire the default-suite command.
 
 ## 7. Agent wiring
 
 The SSOT for their personas is `.claude/agents/develop/<name>.md`. Do not duplicate mission text here. Pass the shared-vocabulary paths (`specs.md`, `_shared/components.yaml`, etc.) to every Task. Passing artifacts by path (never pasting bodies into a Task) and choosing the model at Task launch in Cursor both follow mainline develop skill §5.
 
-**Concurrency is the default, serialization the exception**: always launch Tasks with no dependency simultaneously. Whether they can run concurrently, how to issue them, and how to handle exclusive resources are authoritative in mainline develop skill §4 (**when a producer reports that it skipped execution for exclusivity, close the concurrent section, have one agent run them all, settle red/green, and only then move to verification**).
+**Concurrency is the default, serialization the exception**: always launch Tasks with no dependency simultaneously. Whether they can run concurrently, how to issue them, and how to handle exclusive resources are authoritative in mainline develop skill §4 (**when a producer reports that it skipped execution for exclusivity, close the concurrent section, have one agent run the skipped feature IDs plus blast radius, settle red/green of that selection, and only then move to verification**). When to run a selection vs the whole default suite is the same section (test-run granularity).
 
 | Agent | Point in the flow | Task input | Exit |
 | --- | --- | --- | --- |

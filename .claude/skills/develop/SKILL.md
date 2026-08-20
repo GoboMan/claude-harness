@@ -151,14 +151,14 @@ On the foundation of the contract frozen in Phase3, implement frontend and backe
 - **4b backend** (`backend-logic-implementer`, 🤖): backend logic per the contract, Red→Green→Refactor. Concurrent with 4a.
 - **Integration (no dedicated phase)**: the contract's edge on the frontend-logic side (the HTTP API client, the Server Actions call boundary, etc. — **follow the framework's shape**) is implemented as a real, contract-conformant thing. **FE-side contract-conformance tests are not filed for now** (on the premise that a dedicated FE test harness is set up separately). The machine oracle is carried by the **BE tests**, and the FE gap is covered by the human eyeball (appearance) and `slice-reviewer` (with `/attack` by the human if needed). No dedicated integration phase is placed.
   > **E2E is kept out of the develop phases (for now).** Browser-driven E2E with a live environment tends to make environment setup a blocker to starting. Projects that need it add it themselves. **What counts as the contract's edge is defined by the framework's testing rules (the leaves you pass)** (on BE, the entry edge is verified by the default suite; machine verification of the FE edge is paused for now).
-- **Split test suites by what execution requires.** Only suites that start no external environment (= the default suite) are subject to this phase's red-green loop; those needing a real DB or real service connections (integration) and those needing a browser or a real device (system) go into separate folders and separate commands, run at a boundary (before returning, before commit, in CI) or outside the phases. **BE contract-conformance tests belong to the default suite** (they start no external environment) — moving them to the integration side drops that guarantee out of the red-green loop. Locations and run commands are defined by the framework's testing rules (the leaves you pass).
+- **Split test suites by what execution requires.** Only suites that start no external environment (= the default suite) are subject to this phase's red-green loop; those needing a real DB or real service connections (integration) and those needing a browser or a real device (system) go into separate folders and separate commands, run at a boundary or outside the phases. **BE contract-conformance tests belong to the default suite** (they start no external environment) — moving them to the integration side drops that guarantee out of the red-green loop. Locations and run commands are defined by the framework's testing rules (the leaves you pass). **Which slice of the default suite a round runs, versus when the whole default suite runs, is §4 test-run granularity** — the default suite is the pool the loop may draw from, not a command fired after every mutation.
 - **Launch order**:
   1. Launch `test-designer` **exactly once, on the `backend logic` track** (never let it write from the implementation). **Do not launch the UI-display / frontend-logic tracks** (no FE tests for now; do not let it multiply existing FE tests as a model).
   2. **Default is: start on receipt / start on dependency.** Start 4b upon receiving the BE Red tests. 4a-1 **may run concurrently with** test-designer once the contract is `fixed` (do not wait for FE Red).
   3. After 4a-1 completes (human eyeball), run 4a-2 (wiring into the appearance; no FE tests are passed).
-  4. **Close the concurrent section**: if any verification was skipped because of an exclusive resource (§4), delegate a consolidated run to one agent running alone and **settle red/green before moving on**.
+  4. **Close the concurrent section**: if any verification was skipped because of an exclusive resource (§4), delegate a consolidated run to one agent running alone and **settle red/green of that selection before moving on** (the skipped feature IDs + blast radius; §4 test-run granularity). Do not order a whole-default-suite run here.
   5. Once FE and BE implementations are both in, launch **`slice-reviewer`** (🔴). Iterate to zero defects (round limit in §4). **`slice-attacker` / `system-attacker` are not launched in this phase.**
-  6. On zero defects, hand off to `committer`.
+  6. On zero defects, **order the whole default suite once** (§4 test-run granularity), then hand off to `committer`.
 - **Important**: if you find yourself wanting to change the contract, stop implementation and send it back to Phase3.
 - **Done when (per slice)**: the appearance has been eyeballed by a human, the FE logic conforms to the contract (types, lint, etc.), the BE logic is green and contract-conformant, and **`slice-reviewer`'s defect list is empty**.
 
@@ -199,6 +199,22 @@ When an SSOT change becomes necessary mid-implementation, stop implementation, f
 - **Circuit breaker**: if the same defect or inconsistency (or the same location) survives **3 rounds**, stop looping on machine + AI and escalate to the 🙋 human (present the defect, the history, and why it is stuck, and ask for a decision).
 - **Read post-round test failures as a per-class (per-file) breakdown.** A total count alone hides a regression — a class that was green turning red gets lost among the new Reds. Separate expected new Reds from unexpected regressions before sending anything back.
 
+### Test-run granularity (this section is authoritative for when to run what)
+
+The default suite is **the pool the red-green loop may draw from**, not a command fired after every mutation. Treating every round as a "final judgment" and running the whole default suite is forbidden.
+
+| Moment | What you run | What "green" means |
+| --- | --- | --- |
+| A fix / rework round (including the consolidated run after an exclusive-resource skip) | The **reds of this round + their blast radius** | That selection is green |
+| Declaring the slice ready for `committer` (after `slice-reviewer`'s empty list) | The **whole default suite, once** | The host `CLAUDE.md`'s default-suite command exits 0 |
+| CI (push, pull request, merge) | The whole default suite (and whatever else CI defines) | CI |
+
+**Blast radius is not the single failing test, and not the whole default suite.** It is the tagged suites (`F-xxx`) that observe the same path as the files this round changed. Suites that share a session, a lock, a stash, a microphone, a write-chain, or a similar cross-feature progression sit in each other's blast radius even when their feature IDs differ. When unsure, widen the selection by neighboring `F-xxx` tags — never by firing the default-suite command.
+
+How to select (the tag, the filter flag) is in the framework testing leaves you pass. This section decides only **when**. Integration and system suites remain at a boundary or outside the phases, as already stated in Phase4.
+
+**The orchestrator never orders a whole-default-suite run as part of a fix round, a probe, or a reviewer round.** "Settle red/green" in this skill means the matching row in the table above.
+
 ### Updating the ledger
 
 Update the phase column in the ledger (`docs/specs/specs.md`) at every phase transition. The ledger is a shared file, so the orchestrator writes the phase column for concurrent slices itself on each receipt (never let a concurrent agent write it).
@@ -216,7 +232,7 @@ At every launch, **launch simultaneously if all 4 conditions below hold** (seria
 
 **The main arena for this is concurrent independent slices.** Slices whose contracts are `fixed` and that satisfy conditions 1–4 may run **up to 2–3 at a time**, each carrying its whole Phase4 chain (test-designer → implementation → slice-reviewer → committer) — capped so a human can still follow a rework. **However, when they share an exclusive execution resource, the orchestrator serializes the steps that take it so they do not overlap across chains** (see below).
 
-- **Never run steps that take an exclusive execution resource at the same time** (the git index, a single build/run environment, etc.). **When a producer reports "skipped execution due to exclusivity", close the concurrent section, have one agent run them all, settle red/green there, and only then move to the next phase** (never pass something unexecuted on to verification or commit). What counts as exclusive is defined by the producer-side rules, so the orchestrator acts on the report.  **This constraint applies equally to judges that run things (slice-reviewer)** — never run two verifications that use an exclusive resource at once.
+- **Never run steps that take an exclusive execution resource at the same time** (the git index, a single build/run environment, etc.). **When a producer reports "skipped execution due to exclusivity", close the concurrent section, have one agent run the skipped feature IDs plus blast radius, settle red/green of that selection there (§4 test-run granularity), and only then move to the next phase** (never pass something unexecuted on to verification or commit). What counts as exclusive is defined by the producer-side rules, so the orchestrator acts on the report.  **This constraint applies equally to judges that run things (slice-reviewer)** — never run two verifications that use an exclusive resource at once.
 - **Never launch `committer` concurrently** (the git index is a shared resource). Delegate one at a time, in order of receipt.
 - If condition 2 breaks mid-run, drop that slice to serial at that moment.
 - Concurrency is a builder-side matter. It does not touch the requirement that oracles/reviewers live in a separate context from the producer.
@@ -253,7 +269,7 @@ At every launch, **launch simultaneously if all 4 conditions below hold** (seria
 
 **Never launched by this skill**: `slice-attacker`, `system-attacker` (reserved for the human-invoked `/attack`).
 
-**Do not add a dedicated agent for the consolidated run (§4 exclusive resources).** Relaunch the same implementer that reported the skip, **alone**, with the same inputs plus the instruction "run them all together and settle red/green".
+**Do not add a dedicated agent for the consolidated run (§4 exclusive resources).** Relaunch the same implementer that reported the skip, **alone**, with the same inputs plus the instruction "run the skipped feature IDs plus their blast radius together and settle red/green of that selection" (never "run the whole default suite").
 
 In a rework round for the 3 implementers, add **the judge's findings (all of them, with their grounds)** to the inputs above and have them fix every item in a single launch.
 
@@ -278,9 +294,9 @@ Every subagent returns by stopping and reporting. **The single branching criteri
 | inconsistency list | structure-oracle | 🤖 send all items back in one round → re-judge on the diff scope (bounded by the circuit breaker; 🙋 if the cause is a human oracle). **On receiving an empty list, the orchestrator marks the contract `fixed`** |
 | GWT or contract is insufficient | test-designer | cause is the SSOT → 🙋 / the contract → 🤖 re-derive |
 | the contract falls short (mid-implementation) | the 3 implementers | closes within the contract → 🤖 / reaches a human oracle → 🙋 |
-| tests not run (skipped due to an exclusive resource) | an implementer | 🛠 close the concurrent section, delegate a consolidated run to one agent, settle red/green (§4 exclusive resources). Never proceed to slice-reviewer or committer with anything unexecuted |
-| tests red | an implementer | 🤖 send all findings back in one round → fix → re-test on the diff scope (bounded by the circuit breaker; 🙋 if the cause is a human oracle) |
-| defect list | slice-reviewer | 🤖 send all findings back in one round → fix → re-verify on the diff scope (bounded by the circuit breaker; 🙋 if the cause is a human oracle). **On receiving an empty list, go to committer** |
+| tests not run (skipped due to an exclusive resource) | an implementer | 🛠 close the concurrent section, delegate a consolidated run to one agent, settle red/green of the skipped feature IDs + blast radius (§4 exclusive resources and test-run granularity). Never proceed to slice-reviewer or committer with anything unexecuted |
+| tests red | an implementer | 🤖 send all findings back in one round → fix → re-test the reds + blast radius (bounded by the circuit breaker; 🙋 if the cause is a human oracle). Never answer a red by ordering the whole default suite |
+| defect list | slice-reviewer | 🤖 send all findings back in one round → fix → re-verify on the diff scope (bounded by the circuit breaker; 🙋 if the cause is a human oracle). **On receiving an empty list, order the whole default suite once (§4 test-run granularity), then go to committer** |
 | structural refutation | skeleton-runner | cause is structural, e.g. the DB → 🙋 / otherwise → rebuild in Phase1/3 |
 | commit result, or a stop + reason for sending back | committer | 🛠 record it. On a stop, re-delegate or send back to the relevant producer per the reason. Never escalate commit success/failure to 🙋 |
 | the ADR file, or "cannot record" | adr-writer | 🛠 keep the record of the outcome. When the decision is unsettled and unwritable → 🙋 |

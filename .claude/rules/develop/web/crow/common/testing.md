@@ -73,7 +73,7 @@ mechanically, and coincides with "may this be mixed into the red-green loop?"
 
 | Suite | The criterion (this alone decides it) | How often it runs |
 | --- | --- | --- |
-| **Default** (unit) | starts no external environment (mocks only at the boundary) | every time, in develop's Phase4 red-green loop |
+| **Default** (unit) | starts no external environment (mocks only at the boundary) | the suite the red-green loop draws from (selection during a round; whole run at a boundary — develop skill §4) |
 | **Integration** | **connects to a real DB or a real service** | at a boundary only (before returning, before commit, in CI) |
 | **System** | **starts a browser or a real device** | outside the phases (opt-in) |
 
@@ -102,7 +102,7 @@ An empty folder there is not a gap.
 Beyond running everything, make **per-feature selective execution** possible with a single command.
 
 - **Stamp every test with its feature ID (`F-xxx` — the same key as the directory name under `docs/specs/`) in a machine-selectable form** (a group attribute or a test-name prefix; the concrete syntax is in the layer leaf)
-- This turns "the tests relevant to this fix" from a judgment into a **mechanical resolution from `F-xxx`**. During the fix loop, run the selection for that feature; push full runs to the boundaries (before returning, before commit, in CI)
+- This turns "the tests relevant to this fix" from a judgment into a **mechanical resolution from `F-xxx`**. **When to run a selection vs the whole default suite is authoritative in develop skill §4 (test-run granularity).** This leaf defines only how to stamp and select by feature ID
 - An untagged test falls out of scoped execution, leaving regression detection to the boundary. **Never let a new test go untagged**
 
 ## Naming

@@ -47,7 +47,7 @@ In every test, make the outermost group (`describe` in most runners) read
 so it can be selected mechanically by the feature ID (the same key as the directory name under `docs/specs/`).
 
 - Write the concrete selection command, matched to the runner, in `CLAUDE.md` (e.g. a name filter for `F-001`)
-- During the fix loop, run the selection for that feature; push full runs to the boundaries (before returning, before commit, in CI)
+- **When to run a selection vs the whole default suite is authoritative in develop skill §4 (test-run granularity).** This leaf defines only how to stamp and select by feature ID
 - **Never let a new test go untagged** (untagged, it falls out of scoped execution and regression detection is left to the boundary)
 
 ---
@@ -74,7 +74,7 @@ split by **what has to be started for that test to run**.
 
 | Suite | The criterion (this alone decides it) | Location (the default example) | How often it runs |
 | --- | --- | --- | --- |
-| **Default** | starts no external environment (mocks only at the boundary) | mirroring the target structure, `__tests__/`, and so on | every time in the red-green loop |
+| **Default** | starts no external environment (mocks only at the boundary) | mirroring the target structure, `__tests__/`, and so on | the suite the red-green loop draws from (selection during a round; whole run at a boundary — develop skill §4) |
 | **Integration** | **connects to a real DB or a real service** | `tests/integration/` | at a boundary only (before returning, before commit, in CI) |
 | **System** | **starts a browser** | `e2e/` | outside the phases (opt-in) |
 

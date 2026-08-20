@@ -42,8 +42,8 @@ That is a defect in the configuration, not in what you are testing, so do not bu
 - The choice, the configuration, and the run command are **recorded in the project's `CLAUDE.md`** (the harness does not pin them)
 - **Scoped execution (the feature ID tag)**: in every test, make the outermost `describe` read
   `describe('F-001 <feature name>', ...)`, so it can be selected mechanically by the feature ID
-  (the same key as the directory name under `docs/specs/`). Run the selection with `jest -t "F-001"`. During the fix loop, run the selection for that feature;
-  push full runs to the boundaries (before returning, before commit, in CI)
+  (the same key as the directory name under `docs/specs/`). Run the selection with `jest -t "F-001"`.
+  **When to run a selection vs the whole default suite is authoritative in develop skill §4 (test-run granularity).** This leaf defines only how to stamp and select by feature ID
 
 ---
 
@@ -71,7 +71,7 @@ mechanically, and coincides with "may this be mixed into §2's red-green loop?"
 
 | Suite | The criterion (this alone decides it) | Location (the default) | How often it runs |
 | --- | --- | --- | --- |
-| **Default** (unit) | starts no external environment (mocks only at the boundary) | as-is (mirroring the target structure, `__tests__/`) | every time in the red-green loop |
+| **Default** (unit) | starts no external environment (mocks only at the boundary) | as-is (mirroring the target structure, `__tests__/`) | the suite the red-green loop draws from (selection during a round; whole run at a boundary — develop skill §4) |
 | **Integration** | **connects to a real API or a real service** | `tests/integration/` | at a boundary only (before returning, before commit, in CI) |
 | **System** | **starts a simulator, a real device, or a browser** | `e2e/` (following the Maestro / Detox convention is fine) | outside the phases (opt-in) |
 
