@@ -1,68 +1,69 @@
 ---
 name: docs-migrate
-description: プロジェクトの docs が harness の現行 docs レイアウト・書式（docs/specs/F-xxx-<slug>/、OpenAPI 契約、テンプレート準拠）に完全準拠しているか機械検査し、旧レイアウト・違反があれば移行・修正する。「docs を移行して」「docs が harness に準拠しているかチェックして」「docs レイアウトを最新化して」や /docs-migrate で起動する。
+description: Mechanically inspect whether a project's docs fully conform to the harness's current docs layout and format (docs/specs/F-xxx-<slug>/, OpenAPI contracts, template conformance), and migrate or fix anything on an old layout or in violation. Triggers on /docs-migrate or on phrases such as "docs を移行して" "docs が harness に準拠しているかチェックして" "docs レイアウトを最新化して" (migrate the docs / check the docs conform to the harness / bring the docs layout up to date).
 ---
 
-# 🔧 docs-migrate — docs の準拠検査と移行
+# 🔧 docs-migrate — conformance inspection and migration of docs
 
-> **準拠の定義はこの skill が持たない。** 正は常に「現行 harness の spec-lint ＋ `.claude/templates/develop/` のテンプレート」である。本 skill は両者を機械オラクルとして回す手続きだけを持つ。harness が改定されたら、lint とテンプレートが新しい正になり、本 skill は書き換え不要で追従する。
+> **This skill does not own the definition of conformance.** Authority always rests with "the current harness's spec-lint + the templates in `.claude/templates/develop/`". This skill holds only the procedure for running those two as machine oracles. When the harness is revised, the lint and templates become the new authority and this skill follows without being rewritten.
 
-## 不変則
+## Invariants
 
-- **内容を変えず、形だけを変える。** 移行は書式・住所の変換であり、仕様（GWT・入出力・契約の形）の意味を変えない。意味を変えたくなったら移行を止めて `/develop`（ssot-definer / contract-author の本来フロー）へ回す。
-- **判定は機械に。** 準拠判定は spec-lint（＋あれば `npx -y @redocly/cli lint`）。自分の目視を合格根拠にしない。
-- **draft / fixed を保存する。** 移行でステータスを昇格も降格もしない（fixed だったものは fixed のまま移す）。
-- **失われる情報を黙って捨てない。** 新書式に住所が無い情報は、develop skill §4「情報のルーティング」の宛先（ADR・issue・commit message）へ振り分け、計画と報告に明記する。
-- **git mv で歴史を保存する。** コピーして消さない。
+- **Change the shape, not the content.** Migration converts format and location; it never changes the meaning of a spec (GWT, inputs/outputs, the shape of a contract). If you find yourself wanting to change meaning, stop the migration and route it to `/develop` (the proper flow through ssot-definer / contract-author).
+- **Let machines judge.** Conformance is judged by spec-lint (plus `npx -y @redocly/cli lint` if available). Never make your own visual inspection the grounds for a pass.
+- **Preserve draft / fixed.** Migration neither promotes nor demotes status (what was fixed moves over still fixed).
+- **Never silently drop information that would be lost.** Information with no home in the new format is routed to the destinations in develop skill §4 "Routing information" (ADR, issues, commit message) and stated explicitly in both the plan and the report.
+- **Preserve history with git mv.** Do not copy and delete.
+- **Language**: these instructions are in English, the output is not. **Report to the human in Japanese**, and keep migrated docs in Japanese (migration converts format and location, never language). State this in every Task input.
 
-## フロー
+## Flow
 
-### 1. 診断（read-only）
+### 1. Diagnose (read-only)
 
-1. `node .claude/tools/spec-lint/spec-lint.mjs validate` を実行。
-2. 結果で分類する:
-   - **準拠**（exit 0・warn のみ）→ warn 一覧と「対応は次回 develop の差分更新で」を報告して**終了**（チェックだけの起動はここまで）。
-   - **旧レイアウト検出** → 2. へ（移行）。
-   - **現行レイアウトだが違反あり** → 2. へ（修正。移行レシピの該当行だけ使う）。
-3. 併せて docs 配下の**全ファイルを棚卸し**し、lint の管轄外のもの（設計メモ・画像・その他）を「移行対象外・現状維持」として一覧に載せる。
+1. Run `node .claude/tools/spec-lint/spec-lint.mjs validate`.
+2. Classify the result:
+   - **Conformant** (exit 0, warnings only) → report the warning list plus "these get handled in the next develop differential update" and **stop** (an invocation that is only a check ends here).
+   - **Old layout detected** → go to 2 (migrate).
+   - **Current layout but with violations** → go to 2 (fix; use only the relevant lines of the migration recipe).
+3. Alongside that, **take inventory of every file** under docs and list anything outside the lint's jurisdiction (design notes, images, and so on) as "out of scope for migration — left as is".
 
-### 2. 計画（🙋 人間ゲート）
+### 2. Plan (🙋 human gate)
 
-移行マッピング表を提示し、**実行前に必ず承認を取る**（AskUserQuestion / plan mode）:
+Present the migration mapping table and **always get approval before executing** (AskUserQuestion / plan mode):
 
-| 項目 | 提示内容 |
+| Item | What to present |
 | --- | --- |
-| 対応表 | 旧パス → 新パス（機能ごと。slug の命名案を含む） |
-| 変換 | 何を機械移設し、何を内容変換するか（契約 md → OpenAPI yaml 等） |
-| 行き場のない情報 | 新書式に住所が無い記述と、その振り分け先 |
-| 対象外 | 触らないファイル |
+| Mapping | old path → new path (per feature, including proposed slug names) |
+| Conversion | what is relocated mechanically vs. what is content-converted (contract md → OpenAPI yaml, etc.) |
+| Homeless information | descriptions with no home in the new format, and where each is routed |
+| Out of scope | files that will not be touched |
 
-### 3. 実行
+### 3. Execute
 
-**機械移設（本体が直接行う。オラクルが機械なので producer 分離は不要）:**
+**Mechanical relocation (done directly by the main agent; the oracle is a machine, so producer separation is unnecessary):**
 
-- ディレクトリ作成・`git mv`・台帳の書き換え・リンク張り替え・フロントマターのキー合わせ。
-- 雛形が要るものはテンプレート（`.claude/templates/develop/`）を正として使う。
-- `_shared/components.yaml` が要るなら、先に旧契約群からエラーコード等の共有語彙を機械抽出してシードする（変換 Task の `$ref` 先を先に立てる）。
+- Creating directories, `git mv`, rewriting the ledger, re-pointing links, aligning frontmatter keys.
+- Where a scaffold is needed, use the templates (`.claude/templates/develop/`) as authority.
+- If `_shared/components.yaml` is needed, seed it first by mechanically extracting shared vocabulary (error codes and so on) from the old contracts (stand up the `$ref` targets before the conversion Tasks run).
 
-**内容変換（書式の所有者へ Task 委譲）:**
+**Content conversion (delegated to the owner of the format via Task):**
 
-- 契約の変換（旧 md → `api-contract.yaml`）は **`contract-author`**（`.claude/agents/develop/contract-author.md`）へ機能単位で委譲する。入力に「旧契約・対応する spec・共有語彙パス」を渡し、**旧契約の形を保存する変換**であることを明示する。並行可（`_shared` へは書かせず報告で受け、本体が反映）。
-- spec 本文の書式が現行テンプレートと乖離している場合の再構成は **`ssot-definer`** へ同様に委譲する（内容保存・差分更新プロトコル準拠）。
+- Converting contracts (old md → `api-contract.yaml`) is delegated per feature to **`contract-author`** (`.claude/agents/develop/contract-author.md`). Pass "the old contract, the corresponding spec, the shared-vocabulary paths" as input, and state explicitly that this is **a conversion that preserves the shape of the old contract**. May run concurrently (never let them write to `_shared`; receive requests as reports and apply them from the main agent).
+- Restructuring a spec body that has drifted from the current template is delegated the same way to **`ssot-definer`** (content-preserving, following the differential-update protocol).
 
-### 4. 検証
+### 4. Verify
 
-1. `spec-lint validate` が **exit 0** になるまで 3. を反復（同一違反が 3 ラウンド解消しなければ 🙋 へ昇格）。
-2. 旧パスへの参照が repo に残っていないか grep する（プロジェクトの CLAUDE.md・README・CI 設定・フック類）。残存は張り替えるか、対象外なら報告に載せる。
-3. warn は修正対象にしない（内容の浄化は移行のスコープ外。一覧で報告し、次回 develop の差分更新に委ねる）。
+1. Iterate step 3 until `spec-lint validate` returns **exit 0** (if the same violation survives 3 rounds, escalate to 🙋).
+2. Grep for any remaining references to old paths in the repo (the project's CLAUDE.md, README, CI config, hooks). Re-point what remains, or put it in the report if it is out of scope.
+3. Warnings are not in scope to fix (cleaning up content is outside migration). Report them as a list and leave them to the next develop differential update.
 
-### 5. 記録
+### 5. Record
 
-- commit は **`committer`**（`.claude/agents/develop/committer.md`）へ委譲する（意図: docs レイアウト移行・対応表の要約）。
-- 移行で振り分けた情報（ADR 行き・issue 行き）があれば、それぞれ `adr-writer` への委譲・人間への引き継ぎとして報告に残す。
+- Delegate the commit to **`committer`** (`.claude/agents/develop/committer.md`) (intent: docs layout migration, with a summary of the mapping).
+- If the migration routed information elsewhere (bound for an ADR or an issue), leave each in the report as a delegation to `adr-writer` or a handoff to the human.
 
-## この skill がしないこと
+## What this skill does not do
 
-- **仕様の改善・浄化**（spec 肥大の解消、GWT の書き直し）— warn として報告するだけ。実施は `/develop` の差分更新で。
-- **harness 自体の修正** — lint やテンプレートの不備を見つけたら、直さずに人間へ報告する（準拠先を移行作業の中で動かさない）。
-- **PRD.md / design.md の捏造** — 無ければ「任意・未作成」と報告するだけ。書くのは人間（または人間の指示）。
+- **Improve or clean up specs** (relieving spec bloat, rewriting GWT) — report them as warnings only. They get done in a `/develop` differential update.
+- **Fix the harness itself** — if you find a flaw in the lint or the templates, report it to the human rather than fixing it (never move the conformance target during a migration).
+- **Fabricate PRD.md / design.md** — if absent, simply report them as "optional, not written". Writing them is for the human (or on the human's instruction).

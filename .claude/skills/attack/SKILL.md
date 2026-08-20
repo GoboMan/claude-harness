@@ -1,64 +1,65 @@
 ---
 name: attack
-description: 本番相当の環境でレッドチーム攻撃（スライス単位またはシステム横断）を実行する。このスキルを起動したメインエージェントは orchestrator として振る舞い、自分では攻撃せず .claude/agents/develop の slice-attacker / system-attacker を指揮する。「/attack」「攻撃して」「レッドチームで壊して」など人間が攻撃を明示したときだけ起動する（「開発したい」「実装して」「レビューして」だけでは起動しない。develop ループには含めない）。
+description: Run a red-team attack (per-slice or system-wide) in a production-equivalent environment. The main agent that invokes this skill acts as the orchestrator: it never attacks itself, it directs slice-attacker / system-attacker in .claude/agents/develop. Launch only when the human explicitly asks for an attack — "/attack", "攻撃して", "レッドチームで壊して" (attack it / break it with a red team). Never launch from "開発したい" "実装して" "レビューして" alone, and never as part of the develop loop.
 ---
 
 # orchestrator (attack)
 
-> **役割**: 本スキル起動時、あなたは攻撃の orchestrator である。自身では攻撃シナリオの実行・コード修正・git 操作を行わず、`.claude/agents/develop/slice-attacker.md` / `system-attacker.md` を別コンテキスト（Task）で指揮する。**agents は develop キーを共用する**（本 skill 専用の agents ツリーは無い）。
+> **Role**: While this skill is active you are the attack orchestrator. Do not run attack scenarios, fix code, or run git yourself — direct `.claude/agents/develop/slice-attacker.md` / `system-attacker.md` in a separate context (Task). **The agents are shared with the develop key** (there is no agents tree specific to this skill).
 >
-> **位置づけ**: `/develop` の完成条件外。人間が明示したときだけの任意武器。develop / develop-light からは起動しない。
+> **Where this sits**: outside `/develop`'s definition of done. An optional weapon, only when the human says so. Never launched from develop or develop-light.
 
-## 1. コア制約（違反禁止）
+## 1. Core constraints (never violate)
 
-- **人間明示のみ**: AI が「念のため攻撃も」と自己判断して本 skill に入ってはならない。
-- **非修正**: 攻撃と報告だけ。壊れたら欠陥として返す。コード／SSOT／契約を直さない（直しが必要なら人間に報告し、必要なら `/develop` へ誘導）。
-- **予算必須**: 各 attacker に攻撃予算（本数上限）を必ず渡す。渡さない・無制限は禁止。
-- **develop との分離**: 本 skill の通過／失敗は develop の完成条件に影響しない（報告のみ）。
+- **Human-explicit only**: the AI must never decide on its own to "attack too, just in case" and enter this skill.
+- **No fixing**: attack and report only. When you break something, return it as a defect. Do not fix code, SSOT, or contracts (if a fix is needed, report it to the human and route to `/develop` if appropriate).
+- **A budget is mandatory**: always pass each attacker an attack budget (a cap on the number of attempts). Omitting it or passing "unlimited" is forbidden.
+- **Separation from develop**: passing or failing this skill has no bearing on develop's definition of done (report only).
+- **Language**: these instructions are in English, the output is not. **Report to the human in Japanese**, and write defect descriptions in Japanese. State this in every Task input. Identifiers, paths, commands, and payloads stay as they are.
 
-## 2. スコープ判定（起動直後）
+## 2. Deciding scope (immediately on launch)
 
-人間の指示から次を決める。曖昧なら 🙋 で確認してから起動する。
+Decide the following from the human's instruction. If ambiguous, confirm with 🙋 before launching.
 
-| スコープ | 起動する agent | 既定予算 |
+| Scope | Agent to launch | Default budget |
 | --- | --- | --- |
-| 単一スライス／1 機能 | `slice-attacker` | **10** |
-| システム全体・スライス横断・NFR | `system-attacker` | **15** |
-| 両方明示 | 順に（または依存が無ければ並行可） | 上表どおり |
+| a single slice / one feature | `slice-attacker` | **10** |
+| the whole system, cross-slice, NFRs | `system-attacker` | **15** |
+| both, explicitly | in sequence (or concurrently if there is no dependency) | as in the table |
 
-規模で予算を微調整してよいが、ゼロや無制限にはしない。
+You may tune the budget for size, but never set it to zero or unlimited.
 
-## 3. フロー
+## 3. Flow
 
 ```
-スコープ・予算の確定
-  → slice-attacker および／または system-attacker を Task 起動
-  → 報告を人間へ提示（破壊成功一覧・未実行候補）
-  → 修正はしない。必要なら /develop 誘導を添える
+settle scope and budget
+  → launch slice-attacker and/or system-attacker as Tasks
+  → present the report to the human (successful breaks, unattempted candidates)
+  → do not fix. Add a pointer to /develop if needed
 ```
 
-### Task 入力（必ず渡す）
+### Task input (always pass)
 
-- 攻撃対象（スライスなら `spec.md`・契約パス。全体なら全体 SSOT／台帳パス）
-- 本番相当の実行環境の手がかり（プロジェクトの起動方法が分かればパスやコマンド）
-- **攻撃予算**
-- 再攻撃ラウンドなら: 前回の欠陥／違反リスト＋変更範囲
+- The attack target (for a slice: the `spec.md` and contract paths; for the whole system: the system SSOT / ledger paths)
+- Hints for the production-equivalent runtime (paths or commands, if the project's startup method is known)
+- **The attack budget**
+- On a re-attack round: the previous defect/violation list plus the change scope
 
-Cursor では attacker は判断ゾーンとして、Task 起動時に実行環境が提示する候補のうち上位モデルを選ぶ（親の `inherit` 任せにしない。slug のベタ書きはしない。詳細は develop skill §5）。
+In Cursor, treat the attacker as a judgment zone and pick a top-tier model from the candidates the runtime offers at Task launch (do not leave it to the parent's `inherit`; do not hardcode a slug — see develop skill §5).
 
-### 受信時
+### On receipt
 
-| 受信 | 出口 |
+| Received | Exit |
 | --- | --- |
-| 破壊成功一覧（空＝通過） | 🙋 人間へ提示。空なら「破壊失敗＝攻撃では破れなかった」と報告 |
-| 未実行候補（優先度つき） | 必ず提示。高優先が残れば追加ラウンドの要否を人間に聞く。**無言切り捨て禁止** |
-| 環境不足で攻撃不能 | 何が足りないかを報告して停止。捏造した環境で攻撃したことにするな |
+| list of successful breaks (empty = pass) | 🙋 present to the human. If empty, report it as "failed to break — the attack could not get through" |
+| unattempted candidates (with priority) | always present them. If high-priority ones remain, ask the human whether another round is warranted. **Silently dropping them is forbidden** |
+| cannot attack, environment missing | report what is missing and stop. Never pretend to have attacked in a fabricated environment |
 
-## 4. Agent 配線
+## 4. Agent wiring
 
-| Agent | 用途 |
+| Agent | Purpose |
 | --- | --- |
-| `slice-attacker` | 1 スライスを本番相当で壊す |
-| `system-attacker` | 相互作用・性能・セキュリティ・a11y・データ整合など横断 |
+| `slice-attacker` | break one slice in a production-equivalent environment |
+| `system-attacker` | cross-cutting: interactions, performance, security, a11y, data integrity |
 
-人格の SSOT は `.claude/agents/develop/<name>.md`。ミッション本文をここに複製しない。
+The SSOT for their personas is `.claude/agents/develop/<name>.md`. Do not duplicate mission text here.

@@ -1,12 +1,12 @@
 ---
 name: grilling
-description: 計画や設計についてユーザーに徹底的にインタビューする。構築前に計画をストレステストしたい場合や、'grill' 系のトリガーフレーズが使われた場合に使用する。
+description: Interview the user exhaustively about a plan or design. Use when a plan should be stress-tested before building, or when a 'grill'-style trigger phrase is used (e.g. "計画を詰めて", "grill me").
 ---
 
-共通の理解に到達するまで、この計画のあらゆる側面について私に徹底的にインタビューしてください。設計ツリーの各分岐をたどり、意思決定間の依存関係を一つずつ解決していきます。
+Interview me exhaustively about every aspect of this plan until we reach a shared understanding. Walk each branch of the design tree, resolving the dependencies between decisions one at a time.
 
-質問はテキストではなく `AskUserQuestion` ツール（質問モード）で行ってください。推奨する回答を先頭の選択肢に置き、ラベルに `(Recommended)` を付けます。離散的な選択肢が自明でない場合でも、ありそうな回答を選択肢として提示してください — 自由記述は常に付く「その他」欄で受けられます。
+Ask via the `AskUserQuestion` tool (question mode) rather than in plain text. Put the answer you recommend first and append `(Recommended)` to its label. Even when the discrete options are not obvious, offer the likely answers as options — free-form input is always available through the "Other" field.
 
-質問は一度に一つずつ行い、それぞれの質問への回答を待ってから次に進んでください。複数の質問を一度に投げかけると混乱を招きます。
+Ask one question at a time, and wait for the answer to each before moving on. Firing several questions at once creates confusion.
 
-コードベースを調べれば答えられる質問の場合は、質問する代わりにコードベースを調べてください。
+When a question could be answered by examining the codebase, examine the codebase instead of asking.

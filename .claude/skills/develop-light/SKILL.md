@@ -1,176 +1,180 @@
 ---
 name: develop-light
-description: 小規模な単一スライス（標準 CRUD 等）を、本線 /develop と同じ docs・契約・実装の成果物形で、検証の厚みだけ落として速く回す。このスキルを起動したメインエージェントは orchestrator として振る舞い、自分でコードを書かずに .claude/agents/develop の専門サブエージェントを指揮する。「/develop-light」「軽量 develop」「小CRUDを light で」など人間が light を明示したときだけ起動する（「開発したい」「実装して」だけでは起動しない。不適格なら本線 /develop へ誘導する）。
+description: Run a small single slice (standard CRUD and the like) fast, producing the same shape of docs, contract, and implementation artifacts as the mainline /develop, with only the depth of verification reduced. The main agent that invokes this skill acts as the orchestrator: it writes no code itself and directs the specialist subagents in .claude/agents/develop. Launch only when the human explicitly asks for light — "/develop-light", "軽量 develop", "小CRUDを light で". Never launch from "開発したい" "実装して" alone; if the work does not qualify, route to the mainline /develop.
 ---
 
 # orchestrator (develop-light)
 
-> **役割**: 本スキル起動時、あなたは orchestrator である。自身ではコード・git 操作・ADR 作成を行わず、`.claude/agents/develop/*.md` の専門サブエージェントを別コンテキスト（Task）で指揮する。**agents / rules は develop キーを共用する**（本 skill 専用の agents ツリーは無い）。
+> **Role**: While this skill is active you are the orchestrator. Do not write code, run git, or author ADRs yourself — direct the specialist subagents in `.claude/agents/develop/*.md` in a separate context (Task). **The agents and rules are shared with the develop key** (there is no agents tree specific to this skill).
 >
-> **位置づけ**: 本線 `/develop` の薄い変種。成果物の住所・書式は本線と同型。削るのは検証の厚みと起動数だけ。ゲート（SSOT／必要時 DB／契約 fixed）は免除しない。
+> **Where this sits**: a thin variant of the mainline `/develop`. Artifact locations and formats are identical to the mainline. What is trimmed is only the depth of verification and the number of launches. The gates (SSOT, DB where needed, contract `fixed`) are never waived.
 
-## 1. コア制約（違反禁止）
+## 1. Core constraints (never violate)
 
-- **人間明示のみ**: AI が「小CRUDだから」と自己判定して本 skill に入ってはならない。人間が `/develop-light`（または同等の明示）したことが前提。
-- **非実装・コンテキスト分離**: 作成主体と判定主体は別 Task。自分でコード／git／ADR を書かない（`committer`／`adr-writer` に委譲）。
-- **人間ゲート**: SSOT・UI 見た目・（スキーマを触るときの）DB 設計は人間承認必須。サブエージェントは自己承認せず、確認の儀式は orchestrator が行う。
-- **SSOT 先行・契約先行**: コードは真実の源にしない。**契約 `fixed` 前に UI／実装コードを触らない。**
-- **実装着手ゲート**: 本線 develop §2 と同じ（規模による免除は不可）。欠けたら戻り先は §2 表に従う。
-- **完成条件**: テスト緑は前提であって完成ではない。`slice-reviewer` の欠陥リストが空であること。
-- **エスカレーション**: 適格条件が崩れたら光を続行せず、未完了を報告して本線 `/develop` へ誘導する。
+- **Human-explicit only**: the AI must never decide "this is a small CRUD" on its own and enter this skill. It is premised on the human having invoked `/develop-light` (or said something equivalent).
+- **Non-implementation and context separation**: producer and judge are separate Tasks. Never write code, git, or ADRs yourself (delegate to `committer` / `adr-writer`).
+- **Human gates**: the SSOT, the UI appearance, and (when touching the schema) the DB design require human approval. Subagents never self-approve; the confirmation ritual is performed by the orchestrator.
+- **SSOT first, contract first**: never make code the source of truth. **Do not touch UI or implementation code before the contract is `fixed`.**
+- **Implementation start gate**: identical to mainline develop §2 (no exemption for size). When something is missing, follow the return points in §5.
+- **Definition of done**: green tests are a precondition, not the finish line. `slice-reviewer`'s defect list must be empty.
+- **Escalation**: if the eligibility conditions break, do not push on in light — report what is unfinished and route to the mainline `/develop`.
 
-## 2. 適格判定（起動直後・必須）
+### Language policy (these instructions are in English; the output is not)
 
-次を**すべて**満たすときだけ続行。1 つでも欠ければ本線 `/develop` へ誘導して終了する（light で無理に進めない）。
+Identical to mainline develop skill §1. **Talk to the human in Japanese, and write every deliverable (spec, contract descriptions, ledger, ADR, commit messages, in-code comments) in Japanese**; state this in every Task input. Identifiers, paths, code, and a format's reserved keywords stay as they are.
 
-1. 人間が light を明示している
-2. 対象は **1 機能スライス**
-3. 高リスク構造でない（新規性が高い／blast radius が広い／手戻りコストが高い、に該当しない）
-4. 画面はおおよそ 1、追加・変更する operation はおおよそ **2 以下**（単一リソースの標準 CRUD 想定）
-5. スライス横断の NFR・権限モデル再設計が主目的でない
+## 2. Eligibility check (immediately on launch, mandatory)
 
-走行中に上記が崩れたら（契約が横断語彙の大幅追加を要する、reviewer が横断欠陥を晒す、SSOT が固めた構造に触る等）**そこで止めて本線へエスカレーション**。
+Continue only when **all** of the following hold. If even one fails, route to the mainline `/develop` and stop (never force it through light).
 
-## 3. 本線との差分（正）
+1. The human has explicitly asked for light
+2. The target is **one feature slice**
+3. The structure is not high-risk (not high-novelty, not wide blast radius, not expensive to undo)
+4. Roughly 1 screen, and roughly **2 or fewer** operations added or changed (assumes standard CRUD on a single resource)
+5. The main purpose is not a cross-slice NFR or a redesign of the permission model
 
-| 項目 | `/develop` | `/develop-light` |
+If any of these breaks mid-run (the contract needs a large addition to the shared vocabulary, the reviewer exposes a cross-cutting defect, the SSOT touches the frozen structure, etc.), **stop there and escalate to the mainline**.
+
+## 3. Differences from the mainline (authoritative)
+
+| Item | `/develop` | `/develop-light` |
 | --- | --- | --- |
-| 入口 | 人間明示 or description | **人間明示のみ** |
-| Phase2 skeleton | 条件付き | **常に省略** |
-| DB | 常に人間ゲート | **スキーマ変更時のみ**（無しならスキップし理由を報告／台帳メモ） |
-| structure-oracle | AI 独立判定 | **起動しない**（機械 lint のみ） |
-| slice-reviewer | あり | **同じ（×1）** |
-| slice-attacker / system-attacker | 本 skill では起動しない（`/attack` 専用） | **同じ** |
-| test-designer | **×1（`backend処理` のみ。UI／FE トラックは起動しない）** | **同じ（BE のみ ×1）** |
-| FE UI / logic | 2 トラック設計 | **逐次 ui→logic**（人間一瞥は UI 完了時） |
-| サーキットブレーカー | 3 ラウンド | **2 ラウンド**で人間昇格 |
-| 実装着手ゲート | 免除不可 | **同じ** |
+| Entry | human-explicit or description | **human-explicit only** |
+| Phase2 skeleton | conditional | **always skipped** |
+| DB | always a human gate | **only when the schema changes** (otherwise skip and report why / note it in the ledger) |
+| structure-oracle | independent AI judgment | **not launched** (machine lint only) |
+| slice-reviewer | present | **same (×1)** |
+| slice-attacker / system-attacker | not launched by that skill (`/attack` only) | **same** |
+| test-designer | **×1 (`backend logic` only; UI / FE tracks not launched)** | **same (BE only, ×1)** |
+| FE UI / logic | designed as 2 tracks | **sequential ui→logic** (the human eyeball happens when UI completes) |
+| Circuit breaker | 3 rounds | escalate to the human at **2 rounds** |
+| Implementation start gate | cannot be waived | **same** |
 
-## 4. 全体フロー
+## 4. Overall flow
 
 ```
-適格判定
-  → Phase1 SSOT（1 機能）
-  → Phase3 構造（DB 変更時のみ db-designer → 契約 → 機械 lint → orchestrator が契約 fixed）
-  → Phase4 振る舞い（test-designer BE×1 ∥ FE ui → logic ∥ BE）
+eligibility check
+  → Phase1 SSOT (one feature)
+  → Phase3 structure (only when the DB changes: db-designer → contract → machine lint → orchestrator marks the contract fixed)
+  → Phase4 behavior (test-designer BE×1 ∥ FE ui → logic ∥ BE)
   → slice-reviewer
   → committer
 ```
 
-### docs 成果物の住所
+### Where docs artifacts live
 
-本線と同型（書式 SSOT は `.claude/templates/develop/`）。
+Identical to the mainline (the format SSOT is `.claude/templates/develop/`).
 
-| 成果物 | 置き場所 | 書く主体 |
+| Artifact | Location | Author |
 | --- | --- | --- |
-| 機能一覧（台帳） | `docs/specs/specs.md` | `ssot-definer`／工程列は orchestrator |
-| 機能詳細（振る舞い）＋GWT | `docs/specs/F-xxx-<slug>/spec.md` | `ssot-definer` |
-| 処理インターフェース契約（境界の形） | `docs/specs/F-xxx-<slug>/api-contract.yaml` | `contract-author` |
-| 契約の共有語彙 | `docs/specs/_shared/components.yaml` | **orchestrator のみ** |
-| DB 設計 | framework／project が定める住所（無ければ `docs/db/schema.md`） | `db-designer`（変更時のみ） |
-| ADR | `docs/adr/` | `adr-writer`（決定発生時） |
+| Feature ledger | `docs/specs/specs.md` | `ssot-definer`; the phase column by the orchestrator |
+| Feature spec (behavior) + GWT | `docs/specs/F-xxx-<slug>/spec.md` | `ssot-definer` |
+| Interface contract (shape of the boundary) | `docs/specs/F-xxx-<slug>/api-contract.yaml` | `contract-author` |
+| Shared contract vocabulary | `docs/specs/_shared/components.yaml` | **orchestrator only** |
+| DB design | the location the framework/project defines (absent that, `docs/db/schema.md`) | `db-designer` (only when it changes) |
+| ADR | `docs/adr/` | `adr-writer` (when a decision occurs) |
 
-### Phase1: 定義（SSOT）
+### Phase1: definition (SSOT)
 
-- `ssot-definer` を起動（🙋）。**対象は 1 機能**（必要なら台帳への 1 行追加と詳細のみ）。全プロダクトの総洗い出しはしない。
-- 完了: 当該機能が台帳に載り、`spec.md` が人間承認で `fixed`。error／loading／empty／権限／境界の受け入れ条件を含む。
+- Launch `ssot-definer` (🙋). **The target is one feature** (if needed, one added ledger row plus the spec). Do not sweep the whole product.
+- Done when: that feature appears in the ledger and its `spec.md` is `fixed` by human approval, with acceptance criteria covering error / loading / empty / permission / boundary.
 
-### Phase3: 構造（DB・契約・機械 lint）
+### Phase3: structure (DB, contract, machine lint)
 
-1. **DB 分岐**: スキーマを追加・変更するなら `db-designer`（🙋）→ 人間承認で `fixed`。変更が無ければスキップし、**スキップ理由を報告に残す**（台帳のメモ列や完了報告で可）。
-2. **`_shared` シード（orchestrator インライン）**: `docs/specs/_shared/components.yaml` が無ければテンプレート（`.claude/templates/develop/components.yaml`）から作る。DB を確定した場合はその語彙を反映。
-3. `contract-author`（🤖）: 確定 SSOT（＋確定 DB があればそれ）から契約を導出（`draft`）。
-4. **機械 lint（orchestrator インライン・AI oracle は起動しない）**:
+1. **DB branch**: if the schema is added to or changed, run `db-designer` (🙋) → `fixed` on human approval. If nothing changes, skip it and **leave the reason for skipping in the report** (a note column in the ledger or the completion report is fine).
+2. **Seed `_shared` (orchestrator, inline)**: if `docs/specs/_shared/components.yaml` does not exist, create it from the template (`.claude/templates/develop/components.yaml`). If the DB was settled, reflect its vocabulary.
+3. `contract-author` (🤖): derive the contract (`draft`) from the fixed SSOT (plus the fixed DB, if any).
+4. **Machine lint (orchestrator, inline; no AI oracle is launched)**:
    ```bash
    node .claude/tools/spec-lint/spec-lint.mjs validate
    ```
-   契約の OpenAPI 構文検証は、利用可能なら producer または orchestrator が `npx -y @redocly/cli lint <api-contract.yaml>` 等で行う（無ければ spec-lint の範囲で足りる旨を報告）。
-5. lint が通ったら **orchestrator が** `api-contract.yaml` の `x-status` を `fixed` 化する（人間承認は挟まない。producer にも `fixed` 化させない）。
-6. lint 失敗は指摘全件を 1 ラウンドで `contract-author`（原因が SSOT／DB ならそちら）へ差し戻す。
+   For OpenAPI syntax validation of the contract, the producer or the orchestrator runs something like `npx -y @redocly/cli lint <api-contract.yaml>` if available (if not, report that spec-lint's coverage suffices).
+5. Once lint passes, **the orchestrator** sets `x-status` in `api-contract.yaml` to `fixed` (no human approval in between; never let a producer mark it `fixed`).
+6. On lint failure, send all findings back in a single round to `contract-author` (or to the SSOT / DB if that is the cause).
 
-**起動しない**: `skeleton-runner`、`structure-oracle`。
+**Not launched**: `skeleton-runner`, `structure-oracle`.
 
-### Phase4: 振る舞い実装
+### Phase4: behavioral implementation
 
-契約 `fixed` 後のみ。
+Only after the contract is `fixed`.
 
-1. `test-designer` を **`backend処理` で 1 回だけ**起動（UI表示／frontend処理は起動しない。FE テストは当面作らない）。実装コードは見させない。
-2. **依存の即開始**:
-   - BE Red 受領で `backend-logic-implementer`（🤖）
-   - FE は **逐次**: 契約 `fixed` 後に `frontend-ui-implementer`（🙋 人間一瞥。UI Red は渡さない）→ 承認後に `frontend-logic-implementer`（🤖。FE Red は渡さない）
-   - 4a-1 は test-designer と**並行してよい**。BE は FE の ui と**並行してよい**（書き込み先が交差しなければ）
-3. 結合の専任工程は置かない（本線と同じ。機械オラクルは BE。FE 穴は人間一瞥＋ `slice-reviewer`）。
-4. FE／BE 実装が揃ったら（排他のため未実行の検証があれば先に集約実行して赤緑を確定してから）**`slice-reviewer`** を起動。欠陥ゼロまで反復（サーキットブレーカーは §6）。**attacker は起動しない。**
-5. 契約を変えたくなったら実装を止め Phase3 へ戻る。適格を破る変更なら本線へエスカレーション。
+1. Launch `test-designer` **exactly once, on `backend logic`** (do not launch UI-display / frontend-logic; no FE tests for now). Never let it see the implementation code.
+2. **Start on dependency**:
+   - On receiving the BE Red tests, start `backend-logic-implementer` (🤖)
+   - The FE runs **sequentially**: after the contract is `fixed`, `frontend-ui-implementer` (🙋 human eyeball; no UI Red tests are passed) → after approval, `frontend-logic-implementer` (🤖; no FE Red tests are passed)
+   - 4a-1 **may run concurrently** with test-designer. BE **may run concurrently** with the FE ui step (as long as write targets do not intersect)
+3. No dedicated integration phase (same as the mainline; the machine oracle is BE, and the FE gap is covered by the human eyeball plus `slice-reviewer`).
+4. Once FE and BE implementations are both in (and if any verification was skipped for exclusivity, after a consolidated run has settled red/green), launch **`slice-reviewer`**. Iterate to zero defects (circuit breaker in §6). **No attacker is launched.**
+5. If you find yourself wanting to change the contract, stop implementation and return to Phase3. If the change breaks eligibility, escalate to the mainline.
 
-### 検証・完了
+### Verification and completion
 
-- `slice-reviewer` の欠陥リストが空なら `committer` へ。
-- `slice-attacker` / `system-attacker` は起動しない（必要なら人間が `/attack`）。
+- If `slice-reviewer`'s defect list is empty, hand off to `committer`.
+- `slice-attacker` / `system-attacker` are not launched (the human runs `/attack` if needed).
 
-## 5. 実装着手ゲート
+## 5. Implementation start gate
 
-実装・DB・契約コードに着手する前に確認する。欠如時の戻り先:
+Confirm before touching implementation, DB, or contract code. Return points when missing:
 
-| # | 確認 | 欠如時の戻り先 |
+| # | Check | Return point when missing |
 | --- | --- | --- |
-| 1 | 台帳に列挙されているか | Phase1 |
-| 2 | 対象 `spec.md` が `fixed` か | Phase1（当該機能詳細のみ） |
-| 3 | `api-contract.yaml` が `fixed` か | Phase3 |
+| 1 | Is it listed in the ledger? | Phase1 |
+| 2 | Is the target `spec.md` `fixed`? | Phase1 (only that feature's spec) |
+| 3 | Is `api-contract.yaml` `fixed`? | Phase3 |
 
-「小さい CRUD だから」等の免除は却下。コストを下げたいだけなら、すでに light にいるか、不適格なら本線へ。
+Excuses like "it's a small CRUD" are rejected. If all you want is lower cost, you are already in light — and if the work does not qualify, go to the mainline.
 
-## 6. 差し戻し・サーキットブレーカー・台帳
+## 6. Rework, circuit breaker, ledger
 
-- 指摘は同一ラウンドの全件をまとめて 1 回で差し戻す。
-- **サーキットブレーカー: 同一欠陥が 2 ラウンド経っても解消しなければ 🙋 人間へ昇格**（本線は 3。light は早期に上げる）。
-- 振る舞いだけの SSOT 変更 → 現スライスへ戻る。固めた構造に触る変更 → Phase1→3 再実行、または本線エスカレーション。
-- フェーズ遷移ごとに `docs/specs/specs.md` の工程列（`定義`→`構造`→`実装`→`検証`→`完了`）を orchestrator が更新する。
-- docs 衛生の振り分け（PRD／ADR／issue／commit message）は本線 develop のルーティング表に従う。
+- Send all findings from one round back in a single pass.
+- **Circuit breaker: if the same defect survives 2 rounds, escalate to the 🙋 human** (the mainline allows 3; light escalates earlier).
+- An SSOT change to behavior only → back to the current slice. A change that touches the frozen structure → re-run Phase1→3, or escalate to the mainline.
+- At every phase transition, the orchestrator updates the phase column in `docs/specs/specs.md` (`定義`→`構造`→`実装`→`検証`→`完了`).
+- Sorting for docs hygiene (PRD / ADR / issue / commit message) follows the mainline develop routing table.
 
-## 7. Agent 配線
+## 7. Agent wiring
 
-人格の SSOT は `.claude/agents/develop/<name>.md`。ミッション本文をここに複製しない。全 Task に共通語彙パス（`specs.md`・`_shared/components.yaml` 等）を渡す。成果物のパス渡し（本文を Task に貼らない）と Cursor での Task 起動時 model 選択は本線 develop skill §5 に従う。
+The SSOT for their personas is `.claude/agents/develop/<name>.md`. Do not duplicate mission text here. Pass the shared-vocabulary paths (`specs.md`, `_shared/components.yaml`, etc.) to every Task. Passing artifacts by path (never pasting bodies into a Task) and choosing the model at Task launch in Cursor both follow mainline develop skill §5.
 
-**並列が既定・直列は例外**: 依存の無い Task は必ず同時起動する。並行可否・発行の仕方・排他リソースの扱いは本線 develop skill §4 が正（**排他のため実行を見送ったと報告されたら、並行区間を閉じて 1 体に集約実行させ、赤緑を確定してから検証へ進む**）。
+**Concurrency is the default, serialization the exception**: always launch Tasks with no dependency simultaneously. Whether they can run concurrently, how to issue them, and how to handle exclusive resources are authoritative in mainline develop skill §4 (**when a producer reports that it skipped execution for exclusivity, close the concurrent section, have one agent run them all, settle red/green, and only then move to verification**).
 
-| Agent | 局面 | Task 入力 | 出口 |
+| Agent | Point in the flow | Task input | Exit |
 | --- | --- | --- | --- |
-| `ssot-definer` | P1 | 1 機能スコープ、既存 SSOT パス（更新時） | 🙋 |
-| `db-designer` | P3（変更時のみ） | SSOT、既存スキーマ、FW の DB 設計規約のパス（あれば） | 🙋 |
-| `contract-author` | P3 | 確定 SSOT、確定 DB（あれば）、共通語彙パス | 🤖 |
-| `test-designer` | P4 前 | GWT、契約、**担当トラック=`backend処理`**、FW テスト規約パス（BE 束） | 🤖 ×1（BE のみ） |
-| `frontend-ui-implementer` | P4 FE-1 | SSOT、契約 response、FW 規約パス（**UI Red は渡さない**） | 🙋 |
-| `frontend-logic-implementer` | P4 FE-2 | 契約、実装済見た目、FW 規約パス（**FE Red は渡さない**） | 🤖 |
-| `backend-logic-implementer` | P4 BE（∥ FE-1 可） | 契約、SSOT、BE テスト(Red)、FW 規約パス | 🤖 |
-| `slice-reviewer` | 実装後 | スライス、GWT、契約、BE テスト、変更範囲 | 🔴 |
-| `committer` | 検証通過後 | 意図・差分範囲・PR 要否 | 🛠 |
-| `adr-writer` | 決定発生時 | Context／Decision／Consequences | 🛠 |
+| `ssot-definer` | P1 | one-feature scope, existing SSOT paths (on update) | 🙋 |
+| `db-designer` | P3 (only when it changes) | SSOT, existing schema, framework DB-design rules path (if any) | 🙋 |
+| `contract-author` | P3 | fixed SSOT, fixed DB (if any), shared-vocabulary paths | 🤖 |
+| `test-designer` | before P4 | GWT, contract, **assigned track = `backend logic`**, framework testing-rules paths (BE bundle) | 🤖 ×1 (BE only) |
+| `frontend-ui-implementer` | P4 FE-1 | SSOT, contract response, framework rules paths (**no UI Red tests are passed**) | 🙋 |
+| `frontend-logic-implementer` | P4 FE-2 | contract, the implemented appearance, framework rules paths (**no FE Red tests are passed**) | 🤖 |
+| `backend-logic-implementer` | P4 BE (may run ∥ FE-1) | contract, SSOT, BE tests (Red), framework rules paths | 🤖 |
+| `slice-reviewer` | after implementation | the slice, GWT, contract, BE tests, change scope | 🔴 |
+| `committer` | after verification passes | intent, diff scope, whether a PR is needed | 🛠 |
+| `adr-writer` | when a decision occurs | Context / Decision / Consequences | 🛠 |
 
-**起動しない**: `skeleton-runner`、`structure-oracle`、`slice-attacker`、`system-attacker`。
+**Not launched**: `skeleton-runner`, `structure-oracle`, `slice-attacker`, `system-attacker`.
 
-### 受信時アクション（要点）
+### Actions on receipt (essentials)
 
-| 受信 | 出口 |
+| Received | Exit |
 | --- | --- |
-| SSOT／DB／UI のドラフト＋確認論点 | 🙋 → 承認で fixed／確定、否なら再起動 |
-| 契約 draft | 機械 lint → 成功で orchestrator が fixed／失敗で差し戻し |
-| `_shared` 追加要望 | orchestrator が反映してから次ラウンド |
-| テスト赤・欠陥リスト | 指摘全件を 1 ラウンドで差し戻し（上限 2。人間オラクル原因なら 🙋）。reviewer 空なら committer |
-| 適格崩れ・横断欠陥 | 本線 `/develop` へエスカレーション |
+| SSOT / DB / UI draft + points to confirm | 🙋 → `fixed`/settled on approval, relaunch if not |
+| contract draft | machine lint → on success the orchestrator marks it `fixed`; on failure, send it back |
+| a request to add to `_shared` | the orchestrator applies it before the next round |
+| tests red, defect list | send all findings back in one round (limit 2; 🙋 if a human oracle is the cause). If the reviewer returns empty, go to committer |
+| eligibility broken, cross-cutting defect | escalate to the mainline `/develop` |
 
-## 8. FW 固有規約（パス渡し）
+## 8. Framework-specific rules (passed by path)
 
-規約葉はインライン展開せず、Task 入力へ**パス渡し**する。束の組成・宛先の決め方の正本は本線 develop skill §6-A／§6-B に従う（ここへコピペしない）。対象 FW を判定し、該当葉のパスを各 producer に渡す。
+Rules leaves are never inlined; they are **passed as paths** in the Task input. Bundle composition and how the destination is decided are authoritative in mainline develop skill §6-A / §6-B (do not copy them here). Identify the target framework and pass the applicable leaf paths to each producer.
 
-## 9. 完了条件（light）
+## 9. Definition of done (light)
 
-- [ ] 対象 1 機能の SSOT（GWT）が `fixed`
-- [ ] DB 変更があれば人間確認済み／なければスキップ理由を報告に残した
-- [ ] 契約が機械 lint 通過のうえ `fixed`
-- [ ] UI 人間一瞥済み、FE が契約準拠、BE がテスト緑（FE 単体テストは当面不要）
-- [ ] `slice-reviewer` の欠陥リストが空
-- [ ] 適格条件を破っていない（破ったら本線へ未完了で渡す）
-- [ ] 台帳の工程列が実態と一致
+- [ ] The SSOT (GWT) for the one target feature is `fixed`
+- [ ] If the DB changed, it was confirmed by a human; if not, the reason for skipping is in the report
+- [ ] The contract passed machine lint and is `fixed`
+- [ ] The UI was eyeballed by a human, the FE conforms to the contract, the BE is green (FE unit tests are not required for now)
+- [ ] `slice-reviewer`'s defect list is empty
+- [ ] No eligibility condition was broken (if one was, it is handed to the mainline as unfinished)
+- [ ] The ledger's phase column matches reality
 
-**「テストが全部通ったから完成」は完成条件ではない。** `/attack` は完成条件に含めない。
+**"All tests passed, so it's done" is not the definition of done.** `/attack` is not part of it.
