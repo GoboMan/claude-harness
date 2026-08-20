@@ -4,52 +4,54 @@ paths:
   - "**/crow3_*/phpunit.xml*"
 ---
 
-# 🧪 crow / backend — テスト設計（PHPUnit）
+# 🧪 crow / backend — test design (PHPUnit)
 
-> **共通則は [common/testing.md](../common/testing.md)**（テスト対象はドメインだけ・1テスト=1振る舞い・
-> 失敗系を含める・モックは境界だけ・決定性・コマンド一発・命名・カバレッジの扱い）。本書は**それに従ったうえで**、
-> PHPUnit 固有の書き方と、crow 生成面の除外を扱う。共通側の再掲はしない。
+> **The common rules are [common/testing.md](../common/testing.md)** (test only the domain, one test = one behavior,
+> include the failure paths, mock only at the boundary, determinism, one command to run, naming, how to treat coverage).
+> This document covers, **on top of following those**, PHPUnit-specific style and the exclusion of crow's generated surface. It never restates the common side.
 >
-> コードは [common/coding.md](../common/coding.md) のスタイル（Allman・snake_case・strict 比較・`!` 禁止）に従う。
+> The code follows [common/coding.md](../common/coding.md)'s style (Allman, snake_case, strict comparison, no `!`).
+>
+> **Write test names and comments in Japanese.**
 
 ---
 
-## 何を Red にするか（kernel／生成面は除外）
+## What to make Red (the kernel and the generated surface are excluded)
 
-共通則の「テスト対象はドメイン（手書き）だけ」を backend で機械的に切る。
+This carves the common rule "test only the domain (hand-written)" mechanically for the backend.
 
-**Red の対象（手書き・`app/`）**
+**Red targets (hand-written, under `app/`)**
 
-- `app/classes/_common_/model_<table>.php` に**自分で定義した**インスタンス／static メソッド
-- 拡張フック（`validation_crow_ext()` / `save_crow_ext()` / `trash_crow_ext()` / `delete_crow_ext()`）
-- `app/classes/_common_/model_<table>_<table>_service.php`（複数表にまたがる業務判定。[backend/model.md](./model.md) §3.12）
-  および `model_<table>_presenter.php` の手書きメソッド
-- `module_*` の `action_*` および、どのテーブルにも属さない手書きユーティリティ（例: `modifier` の独自ヘルパ）
+- Instance and static methods **you defined yourself** in `app/classes/_common_/model_<table>.php`
+- The extension hooks (`validation_crow_ext()` / `save_crow_ext()` / `trash_crow_ext()` / `delete_crow_ext()`)
+- `app/classes/_common_/model_<table>_<table>_service.php` (business decisions spanning several tables — [backend/model.md](./model.md) §3.12)
+  and the hand-written methods of `model_<table>_presenter.php`
+- `action_*` in `module_*`, and hand-written utilities belonging to no table (a custom helper on `modifier`, for example)
 
-> action から呼ばれる側（model / service / presenter / util）は [backend/coding.md](./coding.md) §1.1 により
-> **リクエストを終了させず、`crow::get_hdb()` / `crow_request` を自分で呼ばない**ので、
-> 行オブジェクト・配列・（要るなら）モックした `$hdb` を**引数で渡すだけ**で Red が書ける（下記「crow の境界を差し替える」）。
-> **グローバル状態やスーパーグローバルを差し替えないとテストが書けない**、
-> **SUT が途中で exit してテストが完走しない**——このどちらかなら、それは実装側の [backend/coding.md](./coding.md) §1.1 違反である。
-> テストを捻じ曲げて通すのではなく、実装の欠陥として報告する。
+> Everything called from an action (model / service / presenter / util) **neither terminates the request nor calls
+> `crow::get_hdb()` / `crow_request` itself**, per [backend/coding.md](./coding.md) §1.1, so a Red test can be written
+> **just by passing** row objects, arrays, and (if needed) a mocked `$hdb` **as arguments** (see "Substituting crow's boundaries" below).
+> **If you cannot write a test without substituting global state or superglobals**, or
+> **the SUT exits mid-way and the test cannot finish** — either one is a §1.1 violation on the implementation side ([backend/coding.md](./coding.md)).
+> Do not contort the test to make it pass; report it as an implementation defect.
 
-**Red にしない（1）— `engine/kernel/**`**
+**Not Red (1) — `engine/kernel/**`**
 
-SUT が crow 本体であるテストは起こさない。例:
+Never file a test whose SUT is crow itself. For example:
 
-- `crow_db_table_model::input_from_request()` が受け付ける datetime キー形の網羅・特性化
-- kernel のバリデーション／CSRF／viewpart 解決／mysqli 層そのものの挙動固定
-- 「engine は直接直さないので実測して表を固定する」類の characterization（それは framework 側の関心。app ゲートを直すなら **ゲート側**を Red にする）
+- Sweeping or characterizing the datetime key shapes `crow_db_table_model::input_from_request()` accepts
+- Pinning the behavior of the kernel's validation / CSRF / viewpart resolution / the mysqli layer itself
+- Characterizations of the "we don't fix the engine directly, so let's measure it and pin a table" kind (that is the framework's concern; if you are fixing an app gate, make **the gate** Red)
 
-**Red にしない（2）— crow が差し込む生成メンバ**
+**Not Red (2) — the generated members crow injects**
 
-[backend/model.md](./model.md) §3.6 の「生成済みメンバを再定義しない」と同じ集合。例:
+The same set as "never redefine a generated member" in [backend/model.md](./model.md) §3.6. For example:
 
-- フィールド本体、`m_table_name` / `table_name` / `primary_key`
-- `sql_select_all()` / `sql_select_one()`（定型クエリを別名で生やした手書きメソッドは対象）
-- 定数／enum まわりの `get_<field>_keys()` / `_map()` / `_symbols()` / `get_<field>_str()` / `<field>_str()`
-- 参照テーブルの `<refer>_row()`
-- `db_design.txt` ↔ 生成キャッシュ／`get_*_map()` の一致を値ごとに写経する sync テスト
+- The fields themselves, `m_table_name` / `table_name` / `primary_key`
+- `sql_select_all()` / `sql_select_one()` (a hand-written method that grew a routine query under a different name *is* a target)
+- The constant / enum family: `get_<field>_keys()` / `_map()` / `_symbols()` / `get_<field>_str()` / `<field>_str()`
+- A referenced table's `<refer>_row()`
+- Sync tests that transcribe, value by value, the agreement between `db_design.txt` and the generated cache or `get_*_map()`
 
 ```php
 //  NG: kernel の入力形を特性化する（SUT が engine）
@@ -73,30 +75,30 @@ public function test_is_active_returns_false_when_status_is_banned()
 }
 ```
 
-**境界の判定（迷ったらここ）**
+**Deciding the boundary (come here when unsure)**
 
-| 問い | Yes → | No → |
+| Question | Yes → | No → |
 | --- | --- | --- |
-| 落ちたとき直すコードは `app/` か？ | 対象になりうる | 対象外（kernel／生成面） |
-| 既存の `engine_*_characterization_*` や生成 map sync を増やそうとしているか？ | 止める | — |
+| When it fails, is the code you fix under `app/`? | it can be a target | out of scope (kernel / generated surface) |
+| Are you about to add to an existing `engine_*_characterization_*` or a generated map sync? | stop | — |
 ---
 
-## ツールと配置
+## Tooling and placement
 
-- テストランナーは **PHPUnit**。設定は `phpunit.xml`（または `phpunit.xml.dist`）に集約する
-- **既定スイート**は `tests/` 配下に置き、**対象コードのディレクトリ構成をミラー**する
-- **結合スイート**（実 DB・実サービスに接続するもの）は `tests/integration/` へ分ける（§スイートの分離）
-- 1 テスト対象（クラス／関数）につき **1 テストクラス**。ファイル名＝クラス名
-- **ファイル名の探索規則を `phpunit.xml` に明示する。** PHPUnit の既定は `*Test.php` サフィックスなので、
-  crow の snake_case 命名（`check_value_test.php`）のままだと**1 件も発見されない**。
-  `<testsuite>` の `<directory suffix="_test.php">` を設定する
-- **機能ID タグ**（共通則の「スコープ実行」）: テストクラスに `#[Group('F-001')]`
-  （PHPUnit 9 以前は `@group F-001`）を付ける。指定実行は `phpunit --group F-001`
+- The test runner is **PHPUnit**. Configuration is centralized in `phpunit.xml` (or `phpunit.xml.dist`)
+- **The default suite** lives under `tests/` and **mirrors the directory structure of the code under test**
+- **The integration suite** (anything connecting to a real DB or real service) is split into `tests/integration/` (see "Separating the suites")
+- **One test class** per unit under test (a class or a function). The file name equals the class name
+- **State the file-discovery rule explicitly in `phpunit.xml`.** PHPUnit defaults to the `*Test.php` suffix, so
+  crow's snake_case naming (`check_value_test.php`) means **nothing is discovered at all**.
+  Configure `<directory suffix="_test.php">` in the `<testsuite>`
+- **The feature ID tag** (the common rules' "scoped execution"): put `#[Group('F-001')]` on the test class
+  (`@group F-001` on PHPUnit 9 and earlier). Run the selection with `phpunit --group F-001`
 
-## テストの構造（AAA ＝ Given-When-Then）
+## The structure of a test (AAA = Given-When-Then)
 
-各テストは **Arrange（準備）→ Act（実行）→ Assert（検証）** の3段で書く。
-これは orchestrator が渡す GWT（Given-When-Then）受け入れ条件にそのまま対応する。
+Each test is written in the 3 stages **Arrange → Act → Assert**.
+This maps directly onto the GWT (Given-When-Then) acceptance criteria the orchestrator passes.
 
 ```php
 <?php
@@ -120,27 +122,27 @@ class check_value_test extends TestCase
 }
 ```
 
-> `i_` プレフィックスは**リクエストパラメータ由来であることの印**なので、
-> テスト内で組み立てたリテラルには付けない（付けると印の意味が薄まる）。
+> The `i_` prefix is **the mark of something derived from a request parameter**, so
+> do not put it on literals you assemble inside a test (doing so dilutes what the mark means).
 
-## 命名
+## Naming
 
-- テストクラス名は `<対象>_test`（snake_case）
-- テストメソッド名は **`test_` 始まりで、振る舞いを文で表す** snake_case にする
+- The test class name is `<target>_test` (snake_case)
+- The test method name **starts with `test_` and states the behavior as a sentence**, in snake_case
 
 ```php
 public function test_rejects_name_when_it_exceeds_max_length()
 public function test_returns_error_when_age_is_not_numeric()
 ```
 
-## アサーション（strict を徹底）
+## Assertions (be rigorously strict)
 
-common/coding.md の「真偽値・null は型付比較」「`!` 禁止」をテストでも守る。
+Observe common/coding.md's "typed comparison for booleans and null" and "no `!`" in tests too.
 
-- 値の一致は **`assertSame()`**（型込みの厳密比較）。`assertEquals()` は原則使わない
-- 真偽は **`assertTrue()` / `assertFalse()`**（`assertTrue( ! $x )` のような否定を書かない）
-- null は **`assertNull()` / `assertNotNull()`**
-- 個数・キーなどは専用アサーション（`assertCount()`, `assertArrayHasKey()` 等）を使い、自前で数えて比較しない
+- Value equality is **`assertSame()`** (strict comparison including type). As a rule, do not use `assertEquals()`
+- Truth values are **`assertTrue()` / `assertFalse()`** (never write a negation like `assertTrue( ! $x )`)
+- null is **`assertNull()` / `assertNotNull()`**
+- Counts, keys, and the like use the dedicated assertions (`assertCount()`, `assertArrayHasKey()`, …) — never count and compare by hand
 
 ```php
 $this->assertSame(3, $count);          //  == ではなく型込みで一致
@@ -149,10 +151,10 @@ $this->assertNull($record);
 $this->assertCount(2, $rows);
 ```
 
-## 入力バリエーションはデータプロバイダで
+## Input variations go in a data provider
 
-共通則の「ハッピーパスで終えない」を PHPUnit で実装する手段。
-同じ振る舞いの入力バリエーションは **`@dataProvider`** でまとめ、ケース名を付ける。
+The means of implementing the common rule "do not stop at the happy path" in PHPUnit.
+Group input variations of the same behavior under **`@dataProvider`** and give each case a name.
 
 ```php
 /**
@@ -174,15 +176,14 @@ public static function invalid_names(): array
 }
 ```
 
-## 準備と後始末
+## Setup and teardown
 
-- 準備・後始末は `setUp()` / `tearDown()` に置く（PHPUnit が要求する camelCase なので、
-  この 2 つは snake_case 規約の例外になる）
-- グローバル・静的状態やスーパーグローバル（`$_GET` 等）を書き換えたら、必ず元に戻す
+- Setup and teardown go in `setUp()` / `tearDown()` (PHPUnit requires camelCase, so these two are the exception to the snake_case rule)
+- If you modified global or static state, or a superglobal (`$_GET`, and so on), always restore it
 
-## crow の境界を差し替える
+## Substituting crow's boundaries
 
-モックの対象は crow の**外界に触れる部分**に限る。DB ハンドル（`crow::get_hdb()` 相当）や `crow_request` がそれにあたる。
+Mocking is limited to the parts of crow that **touch the outside world**: the DB handle (the `crow::get_hdb()` equivalent) and `crow_request`.
 
 ```php
 public function test_returns_empty_list_when_no_row_matches()
@@ -199,14 +200,14 @@ public function test_returns_empty_list_when_no_row_matches()
 
 ---
 
-## スイートの分離（`phpunit.xml` で住所ごとに切る）
+## Separating the suites (carve by address in `phpunit.xml`)
 
-実 DB・実サービスに接続するテストは、共通則の
-[「スイートは実行に何を要求するかで分ける」](../common/testing.md)に従って**フォルダで**分ける。
-**`@group integration` のようなタグで分けない。** タグ方式は既定スイートの実行コマンドが
-`--exclude-group` を落とした瞬間に混入し、しかもその混入が緑のまま気づけない。
+Tests that connect to a real DB or a real service are split **by folder**, per the common rule
+["split suites by what execution requires"](../common/testing.md).
+**Never split them with a tag like `@group integration`.** With tags, the moment the default suite's run command
+loses its `--exclude-group`, they leak in — and the leak stays green and goes unnoticed.
 
-PHPUnit の既定探索は `tests` 配下を再帰的に拾うので、**`<exclude>` を書かないと結合テストが既定スイートに混ざる**。
+PHPUnit's default discovery picks up `tests` recursively, so **without an `<exclude>` the integration tests mix into the default suite**.
 
 ```xml
 <testsuites>
@@ -220,23 +221,23 @@ PHPUnit の既定探索は `tests` 配下を再帰的に拾うので、**`<exclu
 </testsuites>
 ```
 
-| スイート | 実行 | いつ回すか |
+| Suite | Run | When it runs |
 | --- | --- | --- |
-| 既定 | `phpunit --testsuite default` | 赤緑ループで毎回。**DB が無いマシンでも緑になること** |
-| 結合 | `phpunit --testsuite integration` | 境界（返す直前・commit 前・CI）のみ |
+| Default | `phpunit --testsuite default` | every time in the red-green loop. **It must go green on a machine with no DB** |
+| Integration | `phpunit --testsuite integration` | at a boundary only (before returning, before commit, in CI) |
 
-`tests/` 直下（既定スイート）では、DB ハンドル等の境界を上記「crow の境界を差し替える」のとおり**必ずモックする**。
-実接続したくなったら、それは `tests/integration/` へ置くべきテストである。
+Directly under `tests/` (the default suite), **always mock** boundaries such as the DB handle, per "Substituting crow's boundaries" above.
+When you find yourself wanting a real connection, that test belongs in `tests/integration/`.
 
 ---
 
-## ✅ テスト着手前チェックリスト
+## ✅ Checklist before starting on tests
 
-- [ ] 対象の GWT 受け入れ条件（orchestrator が渡す）を先に確認したか
-- [ ] **検証対象は手書きドメイン（`app/`）か**（`engine/kernel`・生成メンバ・enum アクセサ網羅・engine 特性化になっていないか）
-- [ ] `phpunit.xml` のファイル探索サフィックスが crow の命名と一致しているか
-- [ ] 書こうとしているテストは実 DB・実サービスに繋ぐか（繋ぐなら `tests/integration/`、繋がないなら `tests/` 直下）
-- [ ] `phpunit.xml` の既定スイートが `tests/integration` を `<exclude>` しているか
-- [ ] `assertSame` / `assertTrue|False` / `assertNull` で strict に検証しているか（`!` を使っていないか）
-- [ ] 入力バリエーションをデータプロバイダにまとめ、ケース名を付けたか（kernel／生成面の値一覧展開になっていないか）
-- [ ] スーパーグローバル・静的状態を元に戻しているか
+- [ ] Did you first check the target's GWT acceptance criteria (passed by the orchestrator)?
+- [ ] **Is what you are verifying hand-written domain code (under `app/`)?** (not `engine/kernel`, a generated member, a sweep of enum accessors, or an engine characterization)
+- [ ] Does the file-discovery suffix in `phpunit.xml` match crow's naming?
+- [ ] Does the test you are about to write connect to a real DB or real service? (if so, `tests/integration/`; if not, directly under `tests/`)
+- [ ] Does the default suite in `phpunit.xml` `<exclude>` `tests/integration`?
+- [ ] Are you verifying strictly with `assertSame` / `assertTrue|False` / `assertNull` (and not using `!`)?
+- [ ] Did you group input variations into a data provider and name the cases? (and not expand a value list from the kernel or the generated surface)
+- [ ] Did you restore superglobals and static state?
